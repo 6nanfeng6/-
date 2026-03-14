@@ -90,7 +90,7 @@ def login_user(username, password):
         if users[username]["password"] != encrypt_password(password):
             return False, "密码错误！", DEFAULT_AI_NAME, DEFAULT_AI_CHARACTER
 
-        # 登录时返回默认角色设定（不再读取用户保存的全局设定）
+        # 登录时返回默认角色设定
         return True, "登录成功！", DEFAULT_AI_NAME, DEFAULT_AI_CHARACTER
     except Exception as e:
         return False, f"登录异常：{str(e)}", DEFAULT_AI_NAME, DEFAULT_AI_CHARACTER
@@ -112,7 +112,7 @@ def reset_password(username, new_password):
 
     return True, "密码重置成功！"
 
-# 保存用户角色设定（全局用户配置，现在仅用于兼容，不影响会话）
+# 保存用户角色设定（全局用户配置，现在仅用于兼容）
 def save_user_character(username, ai_name, ai_character):
     try:
         init_user_db()
@@ -174,6 +174,7 @@ def load_session(username, session_name):
             st.session_state.AI_character = session_data.get("AI_character", DEFAULT_AI_CHARACTER)
             st.session_state.messages = session_data["messages"]
             st.success(f"已加载会话：{session_name}")
+            st.rerun()  # 强制刷新界面，确保侧边栏显示最新设定
     except Exception as e:
         st.error(f"会话加载失败：{str(e)}")
 
@@ -189,6 +190,7 @@ def delete_session(username, session_name):
                 st.session_state.session_name = session_name()
                 st.session_state.AI_name = DEFAULT_AI_NAME
                 st.session_state.AI_character = DEFAULT_AI_CHARACTER
+                st.rerun()
     except Exception:
         st.error("会话删除失败")
 
@@ -203,6 +205,7 @@ def create_new_session(username):
     st.session_state.AI_character = DEFAULT_AI_CHARACTER
     # 保存新的空会话
     save_chat(username)
+    st.rerun()
 
 # -------------------------- 登录状态初始化 --------------------------
 if "is_login" not in st.session_state:
@@ -340,7 +343,6 @@ else:
         # 新建会话（使用默认设定）
         if st.button("新建会话", width="stretch", icon="📝"):
             create_new_session(st.session_state.current_user)
-            st.rerun()
 
         # 会话历史
         st.text("会话历史")
@@ -351,35 +353,38 @@ else:
                 if st.button(session, width="stretch", icon="💬", key=f"load_{session}",
                             type="primary" if session == st.session_state.session_name else "secondary"):
                     load_session(st.session_state.current_user, session)
-                    st.rerun()
             with col2:
                 if st.button("", icon="❌", key=f"delete_{session}"):
                     delete_session(st.session_state.current_user, session)
-                    st.rerun()
 
         st.divider()
-        # AI角色设置（显示当前会话的设定，修改后仅影响当前会话）
+        # AI角色设置（双向绑定session_state，实时同步）
         st.subheader("伴侣信息")
+        
+        # 定义修改回调函数
+        def update_ai_name():
+            st.session_state.AI_name = st.session_state.ai_name_input
+            save_chat(st.session_state.current_user)
+        
+        def update_ai_character():
+            st.session_state.AI_character = st.session_state.ai_char_input
+            save_chat(st.session_state.current_user)
+        
+        # 输入框绑定key和on_change回调
         AI_name = st.text_input(
             "名称", 
             value=st.session_state.AI_name, 
             placeholder="请输入伴侣的名称",
-            key=f"ai_name_{st.session_state.current_user}"
+            key="ai_name_input",
+            on_change=update_ai_name
         )
         character = st.text_area(
             "角色设定", 
             value=st.session_state.AI_character, 
             placeholder="请输入伴侣的角色设定",
-            key=f"ai_char_{st.session_state.current_user}"
+            key="ai_char_input",
+            on_change=update_ai_character
         )
-
-        # 实时更新当前会话的角色设定，并保存到会话文件
-        if AI_name != st.session_state.AI_name:
-            st.session_state.AI_name = AI_name
-            save_chat(st.session_state.current_user)  # 保存到当前会话
-        if character != st.session_state.AI_character:
-            st.session_state.AI_character = character
-            save_chat(st.session_state.current_user)  # 保存到当前会话
 
     # 消息输入框+AI交互
     prompt = st.chat_input("请输入您要问的问题：")
