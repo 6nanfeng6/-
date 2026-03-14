@@ -105,11 +105,14 @@ if "session_name" not in st.session_state:
 
 # 显示聊天信息
 st.text(f"会话名称: {st.session_state.session_name}")
-for message in st.session_state.messages:
-    if message["role"] == "user":
-        st.chat_message("user").write(message["content"])
-    else:
-        st.chat_message("assistant").write(message["content"])
+if not st.session_state.messages:
+    st.info("👋 欢迎使用AI智能助手！请在下方输入框提问，开始你的对话吧～")
+else:
+    for message in st.session_state.messages:
+        if message["role"] == "user":
+            st.chat_message("user").write(message["content"])
+        else:
+            st.chat_message("assistant").write(message["content"])
 
 # 左侧侧边栏
 with st.sidebar:
@@ -164,17 +167,18 @@ if prompt:
         stream=True,
         max_tokens=2000
     )
-    # 非流式返回
-    # st.chat_message("assistant").write(response.choices[0].message.content)
 
     # 流式返回
-    response_message = st.empty()# 创建一个空消息
-    full_response = ""
-    for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            content = chunk.choices[0].delta.content
-            full_response += content
-            response_message.chat_message("assistant").write(full_response)
-    # 添加AI消息
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
-    save_chat()
+   def stream_generator():
+        full_response = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                content = chunk.choices[0].delta.content
+                full_response += content
+                yield content  # 逐字符生成
+        # 保存完整响应
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        save_chat()
+
+    # 使用stream_write更流畅
+    st.chat_message("assistant").write_stream(stream_generator)
