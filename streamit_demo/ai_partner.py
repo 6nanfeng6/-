@@ -358,33 +358,33 @@ else:
                     delete_session(st.session_state.current_user, session)
 
         st.divider()
-        # AI角色设置（双向绑定session_state，实时同步）
+        # AI角色设置（真正实时同步版）
         st.subheader("伴侣信息")
-        
-        # 定义修改回调函数
-        def update_ai_name():
-            st.session_state.AI_name = st.session_state.ai_name_input
-            save_chat(st.session_state.current_user)
-        
-        def update_ai_character():
-            st.session_state.AI_character = st.session_state.ai_char_input
-            save_chat(st.session_state.current_user)
-        
-        # 输入框绑定key和on_change回调
+
+        # 强制从 session_state 读取，确保永远同步
+        ai_name_key = f"ai_name_{st.session_state.session_name}"
+        ai_char_key = f"ai_char_{st.session_state.session_name}"
+
         AI_name = st.text_input(
-            "名称", 
-            value=st.session_state.AI_name, 
+            "名称",
+            value=st.session_state.AI_name,
             placeholder="请输入伴侣的名称",
-            key="ai_name_input",
-            on_change=update_ai_name
+            key=ai_name_key
         )
         character = st.text_area(
-            "角色设定", 
-            value=st.session_state.AI_character, 
+            "角色设定",
+            value=st.session_state.AI_character,
             placeholder="请输入伴侣的角色设定",
-            key="ai_char_input",
-            on_change=update_ai_character
+            key=ai_char_key
         )
+
+        # 只要改了就同步并保存，不需要回调
+        if AI_name != st.session_state.AI_name:
+            st.session_state.AI_name = AI_name
+            save_chat(st.session_state.current_user)
+        if character != st.session_state.AI_character:
+            st.session_state.AI_character = character
+            save_chat(st.session_state.current_user)
 
     # 消息输入框+AI交互
     prompt = st.chat_input("请输入您要问的问题：")
