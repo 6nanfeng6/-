@@ -369,7 +369,8 @@ else:
     logo_path = os.path.join(current_dir, logo_file)
     if os.path.exists(logo_path):
         st.logo(logo_path)
-
+        
+    now_str = datetime.now().strftime("%Y年%m月%d日 %H:%M:%S")
     system_prompt_template = """
                             你是 %s。
                             角色设定：%s
