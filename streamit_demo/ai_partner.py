@@ -367,10 +367,10 @@ else:
                             type="primary" if session == st.session_state.session_name else "secondary"):
                     load_session(st.session_state.current_user, session)
             with col2:  
-            # 删除按钮，一次点击直接删除
-            if st.button("", icon="❌", key=f"delete_{session}_{idx}",
-                    use_container_width=True):
-                delete_session(st.session_state.current_user, session)
+                # 删除按钮，一次点击直接删除
+                if st.button("", icon="❌", key=f"delete_{session}_{idx}",
+                        use_container_width=True):
+                    delete_session(st.session_state.current_user, session)
 
         st.divider()
         # AI角色设置（真正实时同步版）
