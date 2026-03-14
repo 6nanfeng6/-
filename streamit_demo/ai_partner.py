@@ -34,7 +34,10 @@ def save_chat():
 
 # 生成会话标识
 def session_name():
-    return datetime.now().strftime("%Y-%m-%d_%H+8-%M-%S")
+     # 获取当前时间并加上8小时（东八区），解决小时少8的问题
+    local_time = datetime.now() + timedelta(hours=8)
+    # 修正格式符：将%H+8改为%H，因为已经通过timedelta调整了时间
+    return local_time.strftime("%Y-%m-%d_%H-%M-%S")
 
 #加载所有会话列表信息
 def load_sessions():
