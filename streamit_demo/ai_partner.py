@@ -71,11 +71,12 @@ def delete_session(session_name):
     except Exception:
         st.error("会话删除失败")
 
-
-
-
 st.title("AI智能助手")
-st.logo("3.png")
+logo_file = "3.png"
+# 2. 获取当前脚本所在目录（确保云端能找到文件）
+current_dir = os.path.dirname(os.path.abspath(__file__))
+logo_path = os.path.join(current_dir, logo_file)
+st.logo(logo_path)
 system_prompt_template = """
                 你是%s形象的AI智能伴侣，需严格贴合角色设定,
                 你的角色设定是：%s
