@@ -334,7 +334,18 @@ else:
     if "AI_character" not in st.session_state:
         st.session_state.AI_character = DEFAULT_AI_CHARACTER
 
-    st.title("AI智能伴侣")
+    # 添加CSS样式，减少标题上边距
+    st.markdown("""
+        <style>
+        .title {
+            margin-top: -50px;  /* 负数表示向上移动，数值越大移动越多 */
+            margin-bottom: 20px; /* 可选：调整标题下方间距 */
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # 给标题添加class，应用样式
+    st.title("AI智能伴侣", anchor="title", help="AI智能伴侣")  # anchor可选，主要是为了定位
 
     # Logo加载（完全不变）
     logo_file = "3.png"
