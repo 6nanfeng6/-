@@ -169,7 +169,7 @@ if prompt:
     )
 
     # 流式返回
-   def stream_generator():
+    def stream_generator():
         full_response = ""
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
