@@ -238,6 +238,7 @@ def create_new_session(username):
     st.session_state.session_name = generate_session_name()
     st.session_state.AI_name = DEFAULT_AI_NAME
     st.session_state.AI_character = DEFAULT_AI_CHARACTER
+    st.session_state.first_message_sent = False
     save_chat(username)
     st.success("已创建新会话！")
     st.rerun()
@@ -251,6 +252,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "session_name" not in st.session_state:
     st.session_state.session_name = generate_session_name()
+if "first_message_sent" not in st.session_state:
+    st.session_state.first_message_sent = False
 # 新增：记录最后一次保存的角色信息，避免重复保存
 if "last_ai_name" not in st.session_state:
     st.session_state.last_ai_name = DEFAULT_AI_NAME
@@ -393,11 +396,10 @@ else:
     """, unsafe_allow_html=True)
 
     # 显示聊天记录（关键：用st.info保留欢迎语原有背景样式，仅调整位置）
-    if len(st.session_state.messages) == 0:
-        # 无对话：显示欢迎语（保留原生st.info样式）
+    if len(st.session_state.messages) == 0 and not st.session_state.first_message_sent:
         st.info("👋 你好！我是你的AI智能伴侣，新建新对话时可在左侧修改我的设定，对话开始后无法更改，快来和我聊天吧～")
     else:
-        # 有对话：只显示聊天记录，不显示欢迎语
+        # 有消息/已发第一条消息：只显示聊天记录
         for message in st.session_state.messages:
             if message["role"] == "user":
                 st.chat_message("user").write(message["content"])
@@ -413,6 +415,7 @@ else:
             st.session_state.session_name = generate_session_name()
             st.session_state.last_ai_name = DEFAULT_AI_NAME
             st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
+            st.session_state.first_message_sent = False
             if "AI_name" in st.session_state:
                 del st.session_state.AI_name
             if "AI_character" in st.session_state:
@@ -479,6 +482,7 @@ else:
     # 消息输入框+AI交互（完全不变）
     prompt = st.chat_input("请输入您要问的问题：")
     if prompt:
+        st.session_state.first_message_sent = True
         st.chat_message("user").write(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
