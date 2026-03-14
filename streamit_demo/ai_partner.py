@@ -256,13 +256,9 @@ if "last_ai_name" not in st.session_state:
     st.session_state.last_ai_name = DEFAULT_AI_NAME
 if "last_ai_char" not in st.session_state:
     st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
-# ===== 新增这3行 =====
-if "stop_generation" not in st.session_state:
-    st.session_state.stop_generation = False
-if "is_generating" not in st.session_state:
-    st.session_state.is_generating = False
-if "abort_signal" not in st.session_state:
-    st.session_state.abort_signal = False
+# 新增：停止生成标记（只加这一行）
+if "stop_ai" not in st.session_state:
+    st.session_state.stop_ai = False
 
 # -------------------------- 未登录界面（完全不变） --------------------------
 if not st.session_state.is_login:
@@ -440,62 +436,57 @@ else:
         if save_needed:
             save_chat(st.session_state.current_user)
 
-    # ===== 核心修改：动态切换发送/停止按钮 =====
-    # 1. 定义聊天输入框（动态按钮文字）
-    button_label = "停止生成" if st.session_state.is_generating else "发送"
-    prompt = st.chat_input(
-        placeholder="请输入您要问的问题：" if not st.session_state.is_generating else "AI正在回复，点击停止...",
-        key="main_chat_input",
-        disabled=st.session_state.is_generating  # 生成中时输入框禁用，只保留按钮功能
-    )
+    # 消息输入框（保持原样）
+    prompt = st.chat_input("请输入您要问的问题：")
     
-    # 2. 处理按钮点击逻辑
-    if prompt is not None:
-        if st.session_state.is_generating:
-            # 点击的是"停止生成"按钮
-            st.session_state.stop_generation = True
-            st.session_state.abort_signal = True  # 强制终止信号
-        else:
-            # 点击的是"发送"按钮
-            st.session_state.stop_generation = False
-            st.session_state.abort_signal = False
-            st.session_state.is_generating = True  # 标记开始生成
+    # 1. 处理用户发送消息
+    if prompt:
+        # 重置停止标记
+        st.session_state.stop_ai = False
+        # 显示用户消息
+        st.chat_message("user").write(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
+    
+        # 2. 显示「停止生成」按钮（核心）
+        stop_col, _ = st.columns([1, 9])
+        with stop_col:
+            stop_btn = st.button("⏹️ 停止生成", key="stop_btn", type="primary")
+            if stop_btn:
+                st.session_state.stop_ai = True  # 点击按钮标记停止
+    
+        # 3. 调用AI生成回复
+        system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
+        try:
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
+                stream=True,
+                max_tokens=2000
+            )
+    
+            # 4. 流式输出+检测停止信号
+            full_response = ""
+            # 创建一个占位符，实时更新AI回复
+            ai_reply_placeholder = st.chat_message("assistant").empty()
             
-            # 显示用户消息
-            st.chat_message("user").write(prompt)
-            st.session_state.messages.append({"role": "user", "content": prompt})
+            for chunk in response:
+                # 关键：检测到停止信号就立刻退出循环
+                if st.session_state.stop_ai:
+                    st.warning("已停止AI回复生成")
+                    break
+                
+                if chunk.choices[0].delta.content is not None:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    # 实时更新显示内容
+                    ai_reply_placeholder.write(full_response)
     
-            # 调用AI生成回复
-            system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
-            try:
-                response = client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
-                    stream=True,
-                    max_tokens=2000
-                )
+            # 5. 保存已生成的内容（即使被打断也保存）
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            save_chat(st.session_state.current_user)
     
-                # 流式生成回复
-                full_response = ""
-                assistant_placeholder = st.chat_message("assistant").empty()  # 占位符实时更新
-                for chunk in response:
-                    # 检测停止信号，立即终止
-                    if st.session_state.stop_generation or st.session_state.abort_signal:
-                        break
-                    if chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
-                        full_response += content
-                        assistant_placeholder.markdown(full_response)  # 实时更新内容
-    
-                # 保存已生成的内容
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                save_chat(st.session_state.current_user)
-    
-            except Exception as e:
-                st.error(f"AI响应失败：{str(e)}")
-            finally:
-                # 无论成功/失败/停止，都重置状态
-                st.session_state.is_generating = False
-                st.session_state.stop_generation = False
-                st.session_state.abort_signal = False
-                st.rerun()  # 刷新页面恢复发送按钮
+        except Exception as e:
+            st.error(f"AI响应失败：{str(e)}")
+        finally:
+            # 重置停止标记
+            st.session_state.stop_ai = False
