@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import json
 import hashlib
 import time
+import threading
 
 # 创建与AI大模型交互的客户端对象
 client = OpenAI(
@@ -12,7 +13,7 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-# 设置页面配置（完全不变）
+# 设置页面配置
 st.set_page_config(
     page_title="AI智能伴侣",
     page_icon="🎓",
@@ -21,16 +22,36 @@ st.set_page_config(
     menu_items={}
 )
 
-# -------------------------- 常量定义（完全不变） --------------------------
+# -------------------------- 常量定义 --------------------------
 DEFAULT_AI_NAME = "小甜甜"
 DEFAULT_AI_CHARACTER = "你是一个少女，很贴心的回复用户的问题"
-CACHE_TTL = 5  # 新增：会话列表缓存5秒，减少文件读取
+CACHE_TTL = 5
 
-# -------------------------- 工具函数（完全不变） --------------------------
+# -------------------------- 工具函数 --------------------------
 def safe_get_session_state(key, default_value=""):
     return st.session_state[key] if key in st.session_state else default_value
 
-# -------------------------- 新增：缓存装饰器（不影响功能） --------------------------
+# -------------------------- 新增：全局变量用于控制流式响应 --------------------------
+class StreamController:
+    """流式响应控制器"""
+    def __init__(self):
+        self.stop_flag = False
+    
+    def reset(self):
+        self.stop_flag = False
+    
+    def stop(self):
+        self.stop_flag = True
+
+# 初始化控制器
+if "stream_controller" not in st.session_state:
+    st.session_state.stream_controller = StreamController()
+if "is_generating" not in st.session_state:
+    st.session_state.is_generating = False
+if "partial_response" not in st.session_state:
+    st.session_state.partial_response = ""
+
+# -------------------------- 缓存装饰器 --------------------------
 def cache_with_ttl(ttl):
     """简单缓存，减少重复读文件"""
     cache = {}
@@ -46,7 +67,7 @@ def cache_with_ttl(ttl):
         return wrapper
     return decorator
 
-# -------------------------- 用户认证函数（完全不变） --------------------------
+# -------------------------- 用户认证函数 --------------------------
 def encrypt_password(password):
     return hashlib.md5(password.encode('utf-8')).hexdigest()
 
@@ -140,7 +161,7 @@ def save_user_character(username, ai_name, ai_character):
     except Exception:
         st.error("角色设定保存失败")
 
-# -------------------------- 会话相关函数（仅优化保存/读取逻辑，功能不变） --------------------------
+# -------------------------- 会话相关函数 --------------------------
 def save_chat(username):
     """优化：内容无变化时不保存，减少磁盘IO"""
     session_name_val = safe_get_session_state("session_name")
@@ -177,7 +198,7 @@ def generate_session_name():
     local_time = datetime.now() + timedelta(hours=8)
     return local_time.strftime("%Y-%m-%d_%H-%M-%S")
 
-@cache_with_ttl(CACHE_TTL)  # 新增：缓存会话列表，5秒内不重复读文件夹
+@cache_with_ttl(CACHE_TTL)
 def load_sessions(username):
     session_list = []
     user_session_dir = f"session/{username}"
@@ -242,7 +263,7 @@ def create_new_session(username):
     st.success("已创建新会话！")
     st.rerun()
 
-# -------------------------- 登录状态初始化（新增保存标记，不影响功能） --------------------------
+# -------------------------- 登录状态初始化 --------------------------
 if "is_login" not in st.session_state:
     st.session_state.is_login = False
 if "current_user" not in st.session_state:
@@ -251,13 +272,12 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "session_name" not in st.session_state:
     st.session_state.session_name = generate_session_name()
-# 新增：记录最后一次保存的角色信息，避免重复保存
 if "last_ai_name" not in st.session_state:
     st.session_state.last_ai_name = DEFAULT_AI_NAME
 if "last_ai_char" not in st.session_state:
     st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
 
-# -------------------------- 未登录界面（完全不变） --------------------------
+# -------------------------- 未登录界面 --------------------------
 if not st.session_state.is_login:
     if "AI_name" in st.session_state:
         del st.session_state.AI_name
@@ -327,7 +347,7 @@ if not st.session_state.is_login:
                 else:
                     st.error(msg)
 
-# -------------------------- 已登录主界面（仅优化角色保存逻辑，功能/界面不变） --------------------------
+# -------------------------- 已登录主界面 --------------------------
 else:
     if "AI_name" not in st.session_state:
         st.session_state.AI_name = DEFAULT_AI_NAME
@@ -336,7 +356,7 @@ else:
 
     st.title("AI智能伴侣")
 
-    # Logo加载（完全不变）
+    # Logo加载
     logo_file = "3.png"
     current_dir = os.path.dirname(os.path.abspath(__file__))
     logo_path = os.path.join(current_dir, logo_file)
@@ -351,7 +371,7 @@ else:
 
     st.text(f"当前用户: {st.session_state.current_user} | 会话名称: {st.session_state.session_name}")
 
-    # 显示聊天记录（完全不变）
+    # 显示聊天记录
     if not st.session_state.messages:
         st.info("👋 你好！我是你的AI智能伴侣！请在下方输入框提问，开始跟我对话吧～")
     else:
@@ -360,6 +380,11 @@ else:
                 st.chat_message("user").write(message["content"])
             else:
                 st.chat_message("assistant").write(message["content"])
+
+    # 显示正在生成的部分响应（用于中断后显示）
+    if st.session_state.is_generating and st.session_state.partial_response:
+        with st.chat_message("assistant"):
+            st.markdown(st.session_state.partial_response + " ... (已中断)")
 
     with st.sidebar:
         st.subheader(f"当前用户：{st.session_state.current_user}")
@@ -382,14 +407,14 @@ else:
         if st.button("新建会话", width="stretch", icon="📝"):
             create_new_session(st.session_state.current_user)
 
-        # 会话历史（优化按钮key，减少重复渲染）
+        # 会话历史
         st.text("会话历史")
         session_list = load_sessions(st.session_state.current_user)
         for session in session_list:
             col1, col2 = st.columns([4, 1])
             with col1:
                 if st.button(session, width="stretch", icon="💬", 
-                            key=f"load_{session}",  # 固定key，不随idx变
+                            key=f"load_{session}",
                             type="primary" if session == st.session_state.session_name else "secondary"):
                     load_session(st.session_state.current_user, session)
             with col2:  
@@ -398,10 +423,9 @@ else:
                     delete_session(st.session_state.current_user, session)
 
         st.divider()
-        # AI角色设置（优化：仅内容真正变化时才保存，打字不卡）
+        # AI角色设置
         st.subheader("伴侣信息")
 
-        # 完全保留你的原始key逻辑，界面/交互不变
         ai_name_key = f"ai_name_{st.session_state.session_name}"
         ai_char_key = f"ai_char_{st.session_state.session_name}"
 
@@ -418,7 +442,6 @@ else:
             key=ai_char_key
         )
 
-        # 优化：仅当内容真正变化时才更新+保存，避免每打一个字都保存
         save_needed = False
         if AI_name != st.session_state.last_ai_name:
             st.session_state.AI_name = AI_name
@@ -429,35 +452,96 @@ else:
             st.session_state.last_ai_char = character
             save_needed = True
         
-        # 批量保存，减少IO次数
         if save_needed:
             save_chat(st.session_state.current_user)
 
-    # 消息输入框+AI交互（完全不变）
-    prompt = st.chat_input("请输入您要问的问题：")
-    if prompt:
+    # -------------------------- 消息输入框+AI交互（添加终止功能）--------------------------
+    
+    # 在生成过程中显示停止按钮
+    if st.session_state.is_generating:
+        col1, col2, col3 = st.columns([1, 1, 5])
+        with col1:
+            if st.button("⏹️ 停止生成", type="primary", use_container_width=True):
+                st.session_state.stream_controller.stop()
+                st.rerun()
+        with col2:
+            if st.button("✅ 确认并保存", use_container_width=True):
+                # 保存已生成的部分
+                if st.session_state.partial_response:
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": st.session_state.partial_response
+                    })
+                    st.session_state.is_generating = False
+                    st.session_state.partial_response = ""
+                    st.session_state.stream_controller.reset()
+                    save_chat(st.session_state.current_user)
+                st.rerun()
+
+    # 消息输入框
+    prompt = st.chat_input("请输入您要问的问题：", disabled=st.session_state.is_generating)
+    
+    if prompt and not st.session_state.is_generating:
+        # 显示用户消息
         st.chat_message("user").write(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
-
+        
+        # 准备开始生成
+        st.session_state.is_generating = True
+        st.session_state.partial_response = ""
+        st.session_state.stream_controller.reset()
+        
         system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
+        
         try:
+            # 创建响应流
             response = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
                 stream=True,
                 max_tokens=2000
             )
-
-            def stream_generator():
-                full_response = ""
-                for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
-                        full_response += content
-                        yield content
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
+            
+            # 创建占位符用于流式输出
+            message_placeholder = st.chat_message("assistant").empty()
+            full_response = ""
+            
+            # 流式输出，支持中断
+            for chunk in response:
+                # 检查是否需要停止
+                if st.session_state.stream_controller.stop_flag:
+                    break
+                
+                if chunk.choices[0].delta.content is not None:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    st.session_state.partial_response = full_response
+                    message_placeholder.markdown(full_response + "▌")
+            
+            # 生成完成或被中断后的处理
+            if st.session_state.stream_controller.stop_flag:
+                # 用户主动中断
+                message_placeholder.markdown(full_response + " ... (已中断)")
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": full_response + " ... (已中断)"
+                })
+                st.session_state.is_generating = False
+                st.session_state.partial_response = ""
+                st.session_state.stream_controller.reset()
                 save_chat(st.session_state.current_user)
-
-            st.chat_message("assistant").write_stream(stream_generator)
+                st.rerun()
+            else:
+                # 正常完成
+                message_placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                st.session_state.is_generating = False
+                st.session_state.partial_response = ""
+                save_chat(st.session_state.current_user)
+                st.rerun()
+                
         except Exception as e:
             st.error(f"AI响应失败：{str(e)}")
+            st.session_state.is_generating = False
+            st.session_state.partial_response = ""
+            st.session_state.stream_controller.reset()
