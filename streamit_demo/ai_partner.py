@@ -20,6 +20,11 @@ st.set_page_config(
     menu_items={}
 )
 
+# -------------------------- 工具函数：安全获取会话状态 --------------------------
+def safe_get_session_state(key, default_value=""):
+    """安全获取session_state值，不存在则返回默认值"""
+    return st.session_state[key] if key in st.session_state else default_value
+
 # -------------------------- 用户认证 + 角色设定存储函数 --------------------------
 def encrypt_password(password):
     return hashlib.md5(password.encode('utf-8')).hexdigest()
@@ -29,24 +34,21 @@ def init_user_db():
         os.mkdir("user_data")
     if not os.path.exists("user_data/users.json"):
         with open("user_data/users.json", "w", encoding="utf-8") as f:
-            # 新增：用户数据包含默认角色设定
             json.dump({}, f, ensure_ascii=False, indent=2)
 
 # 兼容旧数据格式：自动升级为新格式
 def upgrade_user_data(username, users):
-    # 如果是旧格式（值是字符串，不是字典）
     if isinstance(users[username], str):
         users[username] = {
             "password": users[username],
             "AI_name": "小甜甜",
             "AI_character": "你是一个少女，很贴心的回复用户的问题"
         }
-        # 保存升级后的数据
         with open("user_data/users.json", "w", encoding="utf-8") as f:
             json.dump(users, f, ensure_ascii=False, indent=2)
     return users
 
-# 注册（新增：注册时初始化用户角色设定）
+# 注册
 def register_user(username, password):
     init_user_db()
     with open("user_data/users.json", "r", encoding="utf-8") as f:
@@ -55,41 +57,41 @@ def register_user(username, password):
     if username in users:
         return False, "用户名已存在！"
 
-    # 存储：用户名 + 加密密码 + 默认角色设定
     users[username] = {
         "password": encrypt_password(password),
-        "AI_name": "小甜甜",  # 每个用户默认都是小甜甜
+        "AI_name": "小甜甜",
         "AI_character": "你是一个少女，很贴心的回复用户的问题"
     }
     with open("user_data/users.json", "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
 
-    # 创建用户专属会话目录
     user_session_dir = f"session/{username}"
     if not os.path.exists(user_session_dir):
         os.makedirs(user_session_dir)
 
     return True, "注册成功！"
 
-# 登录（新增：兼容旧数据格式 + 登录时加载用户专属的角色设定）
+# 登录
 def login_user(username, password):
     init_user_db()
-    with open("user_data/users.json", "r", encoding="utf-8") as f:
-        users = json.load(f)
+    try:
+        with open("user_data/users.json", "r", encoding="utf-8") as f:
+            users = json.load(f)
 
-    if username not in users:
-        return False, "用户名不存在！", "", ""
+        if username not in users:
+            return False, "用户名不存在！", "小甜甜", "你是一个少女，很贴心的回复用户的问题"
 
-    # 兼容旧数据格式
-    users = upgrade_user_data(username, users)
+        users = upgrade_user_data(username, users)
 
-    if users[username]["password"] != encrypt_password(password):
-        return False, "密码错误！", "", ""
+        if users[username]["password"] != encrypt_password(password):
+            return False, "密码错误！", "小甜甜", "你是一个少女，很贴心的回复用户的问题"
 
-    # 登录成功：返回用户的角色设定
-    return True, "登录成功！", users[username]["AI_name"], users[username]["AI_character"]
+        return True, "登录成功！", users[username]["AI_name"], users[username]["AI_character"]
+    except Exception as e:
+        # 任何异常都返回默认角色设定
+        return False, f"登录异常：{str(e)}", "小甜甜", "你是一个少女，很贴心的回复用户的问题"
 
-# 忘记密码 → 重置密码
+# 忘记密码
 def reset_password(username, new_password):
     init_user_db()
     with open("user_data/users.json", "r", encoding="utf-8") as f:
@@ -98,39 +100,39 @@ def reset_password(username, new_password):
     if username not in users:
         return False, "用户名不存在！"
 
-    # 兼容旧数据格式
     users = upgrade_user_data(username, users)
     
-    # 只改密码，保留原角色设定
     users[username]["password"] = encrypt_password(new_password)
     with open("user_data/users.json", "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
 
     return True, "密码重置成功！"
 
-# 保存用户的角色设定（新增：修改后持久化到用户数据文件）
+# 保存用户角色设定
 def save_user_character(username, ai_name, ai_character):
-    init_user_db()
-    with open("user_data/users.json", "r", encoding="utf-8") as f:
-        users = json.load(f)
+    try:
+        init_user_db()
+        with open("user_data/users.json", "r", encoding="utf-8") as f:
+            users = json.load(f)
 
-    # 兼容旧数据格式
-    users = upgrade_user_data(username, users)
-    
-    if username in users:
-        users[username]["AI_name"] = ai_name
-        users[username]["AI_character"] = ai_character
-        with open("user_data/users.json", "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
+        users = upgrade_user_data(username, users)
+        
+        if username in users:
+            users[username]["AI_name"] = ai_name
+            users[username]["AI_character"] = ai_character
+            with open("user_data/users.json", "w", encoding="utf-8") as f:
+                json.dump(users, f, ensure_ascii=False, indent=2)
+    except Exception:
+        st.error("角色设定保存失败")
 
-# -------------------------- 会话相关函数（用户隔离） --------------------------
+# -------------------------- 会话相关函数 --------------------------
 def save_chat(username):
-    if st.session_state.session_name and username:
+    if safe_get_session_state("session_name") and username:
         session_data = {
-            "session_name": st.session_state.session_name,
-            "AI_name": st.session_state.AI_name,
-            "AI_character": st.session_state.AI_character,
-            "messages": st.session_state.messages
+            "session_name": safe_get_session_state("session_name"),
+            "AI_name": safe_get_session_state("AI_name", "小甜甜"),
+            "AI_character": safe_get_session_state("AI_character", "你是一个少女，很贴心的回复用户的问题"),
+            "messages": safe_get_session_state("messages", [])
         }
         user_session_dir = f"session/{username}"
         if not os.path.exists(user_session_dir):
@@ -173,25 +175,31 @@ def delete_session(username, session_name):
         file_path = f"{user_session_dir}/{session_name}.json"
         if os.path.exists(file_path):
             os.remove(file_path)
-            if session_name == st.session_state.session_name:
+            if session_name == safe_get_session_state("session_name"):
                 st.session_state.messages = []
                 st.session_state.session_name = session_name()
     except Exception:
         st.error("会话删除失败")
 
 # -------------------------- 登录状态初始化 --------------------------
+# 确保核心状态存在，不存在则初始化
 if "is_login" not in st.session_state:
     st.session_state.is_login = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
-# 移除全局默认值，改为登录时加载
-if "AI_name" in st.session_state:
-    del st.session_state.AI_name
-if "AI_character" in st.session_state:
-    del st.session_state.AI_character
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "session_name" not in st.session_state:
+    st.session_state.session_name = session_name()
 
-# -------------------------- 未登录：显示登录/注册/忘记密码 --------------------------
+# -------------------------- 未登录：登录/注册/忘记密码 --------------------------
 if not st.session_state.is_login:
+    # 清空角色相关状态，避免残留
+    if "AI_name" in st.session_state:
+        del st.session_state.AI_name
+    if "AI_character" in st.session_state:
+        del st.session_state.AI_character
+
     st.title("AI智能助手 - 用户登录")
 
     tab1, tab2, tab3 = st.tabs(["登录", "注册", "忘记密码"])
@@ -206,18 +214,16 @@ if not st.session_state.is_login:
             if not login_username or not login_password:
                 st.warning("请输入用户名和密码！")
             else:
-                # 登录成功后加载用户专属角色设定
-                result = login_user(login_username, login_password)
-                if result[0]:
+                success, msg, ai_name, ai_char = login_user(login_username, login_password)
+                if success:
                     st.session_state.is_login = True
                     st.session_state.current_user = login_username
-                    # 加载该用户的角色设定
-                    st.session_state.AI_name = result[2]
-                    st.session_state.AI_character = result[3]
-                    st.success(result[1])
+                    st.session_state.AI_name = ai_name
+                    st.session_state.AI_character = ai_char
+                    st.success(msg)
                     st.rerun()
                 else:
-                    st.error(result[1])
+                    st.error(msg)
 
     # 注册
     with tab2:
@@ -258,10 +264,17 @@ if not st.session_state.is_login:
                 else:
                     st.error(msg)
 
-# -------------------------- 已登录：显示主界面 --------------------------
+# -------------------------- 已登录：主界面 --------------------------
 else:
+    # 兜底初始化角色设定（关键修复）
+    if "AI_name" not in st.session_state:
+        st.session_state.AI_name = "小甜甜"
+    if "AI_character" not in st.session_state:
+        st.session_state.AI_character = "你是一个少女，很贴心的回复用户的问题"
+
     st.title("AI智能伴侣")
 
+    # Logo加载（兼容不存在的情况）
     logo_file = "3.png"
     current_dir = os.path.dirname(os.path.abspath(__file__))
     logo_path = os.path.join(current_dir, logo_file)
@@ -273,12 +286,6 @@ else:
     重要要求：请务必详细、完整回答，内容尽量丰富展开，不要简短敷衍，多给出具体解释和细节。
     你的角色设定是：%s
     """
-
-    # 初始化当前用户的会话和角色状态（仅当不存在时）
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "session_name" not in st.session_state:
-        st.session_state.session_name = session_name()
 
     st.text(f"当前用户: {st.session_state.current_user} | 会话名称: {st.session_state.session_name}")
 
@@ -295,10 +302,11 @@ else:
     with st.sidebar:
         st.subheader(f"当前用户：{st.session_state.current_user}")
         if st.button("退出登录", type="secondary", use_container_width=True, icon="🚪"):
-            # 退出登录时清空所有用户相关状态
+            # 安全清空状态
             st.session_state.is_login = False
             st.session_state.current_user = ""
             st.session_state.messages = []
+            st.session_state.session_name = session_name()
             if "AI_name" in st.session_state:
                 del st.session_state.AI_name
             if "AI_character" in st.session_state:
@@ -332,13 +340,13 @@ else:
                     st.rerun()
 
         st.divider()
-        # AI角色设置（绑定当前用户，修改后持久化）
+        # AI角色设置（带兜底值）
         st.subheader("伴侣信息")
         AI_name = st.text_input(
             "名称", 
             value=st.session_state.AI_name, 
             placeholder="请输入伴侣的名称",
-            key=f"ai_name_{st.session_state.current_user}"  # 加用户标识避免冲突
+            key=f"ai_name_{st.session_state.current_user}"
         )
         character = st.text_area(
             "角色设定", 
@@ -347,7 +355,7 @@ else:
             key=f"ai_char_{st.session_state.current_user}"
         )
 
-        # 实时更新并持久化角色设定
+        # 实时更新并持久化
         if AI_name != st.session_state.AI_name:
             st.session_state.AI_name = AI_name
             save_user_character(st.session_state.current_user, AI_name, st.session_state.AI_character)
@@ -362,21 +370,24 @@ else:
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
-            stream=True,
-            max_tokens=2000
-        )
+        try:
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
+                stream=True,
+                max_tokens=2000
+            )
 
-        def stream_generator():
-            full_response = ""
-            for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    content = chunk.choices[0].delta.content
-                    full_response += content
-                    yield content
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            save_chat(st.session_state.current_user)
+            def stream_generator():
+                full_response = ""
+                for chunk in response:
+                    if chunk.choices[0].delta.content is not None:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        yield content
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                save_chat(st.session_state.current_user)
 
-        st.chat_message("assistant").write_stream(stream_generator)
+            st.chat_message("assistant").write_stream(stream_generator)
+        except Exception as e:
+            st.error(f"AI响应失败：{str(e)}")
