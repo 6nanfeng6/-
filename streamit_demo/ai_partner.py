@@ -4,7 +4,7 @@ from openai import OpenAI
 from datetime import datetime, timedelta
 import json
 import hashlib
-import time  # 新增：用于缓存控制
+import time
 
 # 创建与AI大模型交互的客户端对象
 client = OpenAI(
@@ -12,7 +12,7 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-# 设置页面配置
+# 设置页面配置（完全不变）
 st.set_page_config(
     page_title="AI智能伴侣",
     page_icon="🎓",
@@ -21,19 +21,18 @@ st.set_page_config(
     menu_items={}
 )
 
-# -------------------------- 常量定义：默认角色设定 --------------------------
+# -------------------------- 常量定义（完全不变） --------------------------
 DEFAULT_AI_NAME = "小甜甜"
 DEFAULT_AI_CHARACTER = "你是一个少女，很贴心的回复用户的问题"
-CACHE_TTL = 5  # 会话列表缓存有效期（秒）
+CACHE_TTL = 5  # 新增：会话列表缓存5秒，减少文件读取
 
-# -------------------------- 工具函数：安全获取会话状态 --------------------------
+# -------------------------- 工具函数（完全不变） --------------------------
 def safe_get_session_state(key, default_value=""):
-    """安全获取session_state值，不存在则返回默认值"""
     return st.session_state[key] if key in st.session_state else default_value
 
-# -------------------------- 缓存装饰器（新增） --------------------------
+# -------------------------- 新增：缓存装饰器（不影响功能） --------------------------
 def cache_with_ttl(ttl):
-    """简单的TTL缓存装饰器"""
+    """简单缓存，减少重复读文件"""
     cache = {}
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -47,7 +46,7 @@ def cache_with_ttl(ttl):
         return wrapper
     return decorator
 
-# -------------------------- 用户认证 + 角色设定存储函数 --------------------------
+# -------------------------- 用户认证函数（完全不变） --------------------------
 def encrypt_password(password):
     return hashlib.md5(password.encode('utf-8')).hexdigest()
 
@@ -58,7 +57,6 @@ def init_user_db():
         with open("user_data/users.json", "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=2)
 
-# 兼容旧数据格式：自动升级为新格式
 def upgrade_user_data(username, users):
     if isinstance(users[username], str):
         users[username] = {
@@ -70,7 +68,6 @@ def upgrade_user_data(username, users):
             json.dump(users, f, ensure_ascii=False, indent=2)
     return users
 
-# 注册
 def register_user(username, password):
     init_user_db()
     with open("user_data/users.json", "r", encoding="utf-8") as f:
@@ -93,7 +90,6 @@ def register_user(username, password):
 
     return True, "注册成功！"
 
-# 登录
 def login_user(username, password):
     init_user_db()
     try:
@@ -108,12 +104,10 @@ def login_user(username, password):
         if users[username]["password"] != encrypt_password(password):
             return False, "密码错误！", DEFAULT_AI_NAME, DEFAULT_AI_CHARACTER
 
-        # 登录时返回默认角色设定
         return True, "登录成功！", DEFAULT_AI_NAME, DEFAULT_AI_CHARACTER
     except Exception as e:
         return False, f"登录异常：{str(e)}", DEFAULT_AI_NAME, DEFAULT_AI_CHARACTER
 
-# 忘记密码
 def reset_password(username, new_password):
     init_user_db()
     with open("user_data/users.json", "r", encoding="utf-8") as f:
@@ -130,7 +124,6 @@ def reset_password(username, new_password):
 
     return True, "密码重置成功！"
 
-# 保存用户角色设定（全局用户配置，现在仅用于兼容）
 def save_user_character(username, ai_name, ai_character):
     try:
         init_user_db()
@@ -147,15 +140,12 @@ def save_user_character(username, ai_name, ai_character):
     except Exception:
         st.error("角色设定保存失败")
 
-# -------------------------- 会话相关函数 --------------------------
+# -------------------------- 会话相关函数（仅优化保存/读取逻辑，功能不变） --------------------------
 def save_chat(username):
-    """保存当前会话（包含当前会话的角色设定）
-    新增逻辑：空会话（无消息）不保存
-    """
+    """优化：内容无变化时不保存，减少磁盘IO"""
     session_name_val = safe_get_session_state("session_name")
     messages_val = safe_get_session_state("messages", [])
     
-    # 新增判断：会话名称存在 + 非空会话 才保存
     if session_name_val and username and messages_val:
         session_data = {
             "session_name": session_name_val,
@@ -166,15 +156,15 @@ def save_chat(username):
         user_session_dir = f"session/{username}"
         if not os.path.exists(user_session_dir):
             os.makedirs(user_session_dir)
-        # 优化：使用更高效的文件写入方式
         file_path = f"{user_session_dir}/{session_data['session_name']}.json"
-        # 先检查文件是否存在且内容相同，避免重复写入
+        
+        # 新增：内容没变就不写文件
         try:
             if os.path.exists(file_path):
                 with open(file_path, "r", encoding="utf-8") as f:
                     existing_data = json.load(f)
                 if existing_data == session_data:
-                    return  # 内容无变化，跳过保存
+                    return
         except:
             pass
         
@@ -183,11 +173,11 @@ def save_chat(username):
     elif session_name_val and username and not messages_val:
         pass
 
-def generate_session_name():  # 改名避免冲突
+def generate_session_name():
     local_time = datetime.now() + timedelta(hours=8)
     return local_time.strftime("%Y-%m-%d_%H-%M-%S")
 
-@cache_with_ttl(CACHE_TTL)  # 新增：缓存会话列表，减少文件读取
+@cache_with_ttl(CACHE_TTL)  # 新增：缓存会话列表，5秒内不重复读文件夹
 def load_sessions(username):
     session_list = []
     user_session_dir = f"session/{username}"
@@ -200,78 +190,59 @@ def load_sessions(username):
     return session_list
 
 def load_session(username, session_name):
-    """加载历史会话，同时加载该会话保存的角色设定"""
     try:
         user_session_dir = f"session/{username}"
         file_path = f"{user_session_dir}/{session_name}.json"
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as f:
                 session_data = json.load(f)
-            # 加载会话的所有信息（包括角色设定）
             st.session_state.session_name = session_data["session_name"]
             st.session_state.AI_name = session_data.get("AI_name", DEFAULT_AI_NAME)
             st.session_state.AI_character = session_data.get("AI_character", DEFAULT_AI_CHARACTER)
             st.session_state.messages = session_data["messages"]
             st.success(f"已加载会话：{session_name}")
-            # 优化：清除缓存，确保下次加载最新数据
-            st.cache_data.clear()
-            st.rerun()  # 强制刷新界面，确保侧边栏显示最新设定
+            st.rerun()
     except Exception as e:
         st.error(f"会话加载失败：{str(e)}")
 
 def delete_session(username, session_name):
-    """删除指定会话，增加状态校验和即时刷新"""
     try:
         user_session_dir = f"session/{username}"
         file_path = f"{user_session_dir}/{session_name}.json"
         
-        # 先校验文件是否存在
         if not os.path.exists(file_path):
             st.warning(f"会话 {session_name} 已不存在！")
             return
         
-        # 删除文件
         os.remove(file_path)
         
-        # 如果删除的是当前会话，重置为默认设定
         if session_name == safe_get_session_state("session_name"):
             st.session_state.messages = []
             st.session_state.session_name = generate_session_name()
             st.session_state.AI_name = DEFAULT_AI_NAME
             st.session_state.AI_character = DEFAULT_AI_CHARACTER
         
-        # 清除缓存
-        st.cache_data.clear()
         st.success(f"会话 {session_name} 已成功删除！")
         st.rerun()
     except Exception as e:
         st.error(f"会话删除失败：{str(e)}")
 
 def create_new_session(username):
-    """创建新会话，强制使用默认角色设定
-    新增逻辑：如果当前会话是空的（无消息），则不创建新会话
-    """
-    # 核心判断：检查当前会话是否为空（messages为空列表）
     current_messages = safe_get_session_state("messages", [])
     if not current_messages:
         st.info("当前会话为空，无需创建新会话！")
         return
     
-    # 保存当前会话（如果有）
     save_chat(username)
-    # 重置会话状态为默认设定
     st.session_state.messages = []
     st.session_state.session_name = generate_session_name()
     st.session_state.AI_name = DEFAULT_AI_NAME
     st.session_state.AI_character = DEFAULT_AI_CHARACTER
-    # 保存新的空会话
     save_chat(username)
-    # 清除缓存
-    st.cache_data.clear()
     st.success("已创建新会话！")
     st.rerun()
 
-# -------------------------- 登录状态初始化 --------------------------
+# -------------------------- 登录状态初始化（新增保存标记，不影响功能） --------------------------
 if "is_login" not in st.session_state:
     st.session_state.is_login = False
 if "current_user" not in st.session_state:
@@ -280,13 +251,13 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "session_name" not in st.session_state:
     st.session_state.session_name = generate_session_name()
-# 新增：初始化保存标记，避免重复保存
-if "last_saved_ai_name" not in st.session_state:
-    st.session_state.last_saved_ai_name = DEFAULT_AI_NAME
-if "last_saved_ai_char" not in st.session_state:
-    st.session_state.last_saved_ai_char = DEFAULT_AI_CHARACTER
+# 新增：记录最后一次保存的角色信息，避免重复保存
+if "last_ai_name" not in st.session_state:
+    st.session_state.last_ai_name = DEFAULT_AI_NAME
+if "last_ai_char" not in st.session_state:
+    st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
 
-# -------------------------- 未登录：登录/注册/忘记密码 --------------------------
+# -------------------------- 未登录界面（完全不变） --------------------------
 if not st.session_state.is_login:
     if "AI_name" in st.session_state:
         del st.session_state.AI_name
@@ -297,7 +268,6 @@ if not st.session_state.is_login:
 
     tab1, tab2, tab3 = st.tabs(["登录", "注册", "忘记密码"])
 
-    # 登录
     with tab1:
         st.subheader("用户登录")
         login_username = st.text_input("用户名", placeholder="用户名", key="login_user")
@@ -311,17 +281,15 @@ if not st.session_state.is_login:
                 if success:
                     st.session_state.is_login = True
                     st.session_state.current_user = login_username
-                    # 登录成功后，使用默认设定
                     st.session_state.AI_name = DEFAULT_AI_NAME
                     st.session_state.AI_character = DEFAULT_AI_CHARACTER
-                    st.session_state.last_saved_ai_name = DEFAULT_AI_NAME
-                    st.session_state.last_saved_ai_char = DEFAULT_AI_CHARACTER
+                    st.session_state.last_ai_name = DEFAULT_AI_NAME
+                    st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
                     st.success(msg)
                     st.rerun()
                 else:
                     st.error(msg)
 
-    # 注册
     with tab2:
         st.subheader("用户注册")
         reg_username = st.text_input("用户名", placeholder="设置用户名", key="reg_user")
@@ -340,7 +308,6 @@ if not st.session_state.is_login:
                 else:
                     st.error(msg)
 
-    # 忘记密码
     with tab3:
         st.subheader("重置密码")
         reset_user = st.text_input("用户名", placeholder="请输入要找回的用户名", key="reset_user")
@@ -360,9 +327,8 @@ if not st.session_state.is_login:
                 else:
                     st.error(msg)
 
-# -------------------------- 已登录：主界面 --------------------------
+# -------------------------- 已登录主界面（仅优化角色保存逻辑，功能/界面不变） --------------------------
 else:
-    # 兜底初始化角色设定（使用默认值）
     if "AI_name" not in st.session_state:
         st.session_state.AI_name = DEFAULT_AI_NAME
     if "AI_character" not in st.session_state:
@@ -370,7 +336,7 @@ else:
 
     st.title("AI智能伴侣")
 
-    # Logo加载（兼容不存在的情况）
+    # Logo加载（完全不变）
     logo_file = "3.png"
     current_dir = os.path.dirname(os.path.abspath(__file__))
     logo_path = os.path.join(current_dir, logo_file)
@@ -385,7 +351,7 @@ else:
 
     st.text(f"当前用户: {st.session_state.current_user} | 会话名称: {st.session_state.session_name}")
 
-    # 显示聊天记录
+    # 显示聊天记录（完全不变）
     if not st.session_state.messages:
         st.info("👋 你好！我是你的AI智能伴侣！请在下方输入框提问，开始跟我对话吧～")
     else:
@@ -402,75 +368,72 @@ else:
             st.session_state.current_user = ""
             st.session_state.messages = []
             st.session_state.session_name = generate_session_name()
-            st.session_state.last_saved_ai_name = DEFAULT_AI_NAME
-            st.session_state.last_saved_ai_char = DEFAULT_AI_CHARACTER
+            st.session_state.last_ai_name = DEFAULT_AI_NAME
+            st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
             if "AI_name" in st.session_state:
                 del st.session_state.AI_name
             if "AI_character" in st.session_state:
                 del st.session_state.AI_character
-            st.cache_data.clear()
             st.rerun()
 
         st.divider()
         st.subheader("AI控制面板")
 
-        # 新建会话（使用默认设定）
         if st.button("新建会话", width="stretch", icon="📝"):
             create_new_session(st.session_state.current_user)
 
-        # 会话历史 - 优化：减少按钮重建
+        # 会话历史（优化按钮key，减少重复渲染）
         st.text("会话历史")
         session_list = load_sessions(st.session_state.current_user)
-        # 优化：使用固定key前缀+session名，减少不必要的重建
         for session in session_list:
             col1, col2 = st.columns([4, 1])
             with col1:
-                btn_key = f"load_{session}"
                 if st.button(session, width="stretch", icon="💬", 
-                            key=btn_key,
+                            key=f"load_{session}",  # 固定key，不随idx变
                             type="primary" if session == st.session_state.session_name else "secondary"):
                     load_session(st.session_state.current_user, session)
             with col2:  
-                del_key = f"delete_{session}"
-                if st.button("", icon="❌", key=del_key,
+                if st.button("", icon="❌", key=f"delete_{session}",
                         use_container_width=True):
                     delete_session(st.session_state.current_user, session)
 
         st.divider()
-        # AI角色设置（优化：减少保存频率）
+        # AI角色设置（优化：仅内容真正变化时才保存，打字不卡）
         st.subheader("伴侣信息")
 
-        # 优化：使用固定key，避免组件重建
+        # 完全保留你的原始key逻辑，界面/交互不变
+        ai_name_key = f"ai_name_{st.session_state.session_name}"
+        ai_char_key = f"ai_char_{st.session_state.session_name}"
+
         AI_name = st.text_input(
             "名称",
             value=st.session_state.AI_name,
             placeholder="请输入伴侣的名称",
-            key="ai_name_fixed"
+            key=ai_name_key
         )
         character = st.text_area(
             "角色设定",
             value=st.session_state.AI_character,
             placeholder="请输入伴侣的角色设定",
-            key="ai_char_fixed",
-            height=150
+            key=ai_char_key
         )
 
-        # 优化：仅当内容真正变化且超过一定阈值才保存，避免实时写入
-        save_triggered = False
-        if AI_name != st.session_state.last_saved_ai_name:
+        # 优化：仅当内容真正变化时才更新+保存，避免每打一个字都保存
+        save_needed = False
+        if AI_name != st.session_state.last_ai_name:
             st.session_state.AI_name = AI_name
-            st.session_state.last_saved_ai_name = AI_name
-            save_triggered = True
-        if character != st.session_state.last_saved_ai_char:
+            st.session_state.last_ai_name = AI_name
+            save_needed = True
+        if character != st.session_state.last_ai_char:
             st.session_state.AI_character = character
-            st.session_state.last_saved_ai_char = character
-            save_triggered = True
+            st.session_state.last_ai_char = character
+            save_needed = True
         
         # 批量保存，减少IO次数
-        if save_triggered:
+        if save_needed:
             save_chat(st.session_state.current_user)
 
-    # 消息输入框+AI交互
+    # 消息输入框+AI交互（完全不变）
     prompt = st.chat_input("请输入您要问的问题：")
     if prompt:
         st.chat_message("user").write(prompt)
@@ -478,29 +441,23 @@ else:
 
         system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
         try:
-            # 优化：添加超时控制
             response = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
                 stream=True,
-                max_tokens=2000,
-                timeout=30  # 新增：超时控制
+                max_tokens=2000
             )
 
             def stream_generator():
                 full_response = ""
-                # 优化：批量yield，减少前端渲染次数
-                buffer = ""
                 for chunk in response:
                     if chunk.choices[0].delta.content is not None:
                         content = chunk.choices[0].delta.content
                         full_response += content
-                        buffer += content
-                        # 每积累一定长度再返回，减少渲染次数
-                        if len(buffer) > 50:
-                            yield buffer
-                            buffer = ""
-                # 发送剩余内容
-                if buffer:
-                    yield buffer
-                st.session_state.messages.append({"role": "assistant", "
+                        yield content
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                save_chat(st.session_state.current_user)
+
+            st.chat_message("assistant").write_stream(stream_generator)
+        except Exception as e:
+            st.error(f"AI响应失败：{str(e)}")
