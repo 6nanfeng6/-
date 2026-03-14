@@ -334,12 +334,12 @@ else:
     if "AI_character" not in st.session_state:
         st.session_state.AI_character = DEFAULT_AI_CHARACTER
 
-    # 核心修改：添加全局样式，压缩顶部空白+扩大聊天区域
+    # 核心修改：仅调整间距，不影响任何元素的背景样式
     st.markdown("""
     <style>
-    /* 1. 压缩页面整体顶部空白 */
+    /* 1. 压缩页面整体顶部空白（所有内容上移） */
     .block-container {
-        padding-top: 1rem !important;  /* 大幅减少顶部padding，默认是2rem */
+        padding-top: 0.5rem !important;  /* 大幅减少顶部空白，默认2rem */
         padding-bottom: 1rem !important;
     }
     /* 2. 压缩标题的上下间距 */
@@ -347,25 +347,20 @@ else:
         margin-top: -10px !important;   /* 标题向上移 */
         margin-bottom: 5px !important;  /* 标题和下方文本间距缩小 */
     }
-    /* 3. 压缩用户/会话信息文本的间距 */
-    .user-session-info {
+    /* 3. 压缩用户/会话信息文本的间距（仅调整位置，不改样式） */
+    .user-session-text {
         margin-top: 0px !important;
         margin-bottom: 5px !important;
         font-size: 0.9rem;
     }
-    /* 4. 压缩欢迎语的间距 */
-    .welcome-info {
-        margin-top: 0px !important;
-        margin-bottom: 10px !important;
-    }
-    /* 5. 让聊天消息区域占满空间 */
+    /* 4. 优化聊天消息区域内边距，扩大显示空间 */
     .stChatMessage {
         padding: 0.5rem 1rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # 标题（不变，样式由CSS控制）
+    # 标题（样式不变）
     st.title("AI智能伴侣")
 
     # Logo加载（完全不变）
@@ -381,20 +376,17 @@ else:
     你的角色设定是：%s
     """
 
-    # 修改：给用户/会话信息添加class，方便CSS控制间距
+    # 修改：用户/会话信息 - 仅调整间距，保留原有样式
     st.markdown(f"""
-    <div class="user-session-info">
+    <div class="user-session-text">
     当前用户: {st.session_state.current_user} | 会话名称: {st.session_state.session_name}
     </div>
     """, unsafe_allow_html=True)
 
-    # 显示聊天记录（修改：给欢迎语加class，压缩间距）
+    # 显示聊天记录（关键：用st.info保留欢迎语原有背景样式，仅调整位置）
     if not st.session_state.messages:
-        st.markdown("""
-        <div class="welcome-info">
-        👋 你好！我是你的AI智能伴侣，新建新对话时可在左侧修改我的设定，对话开始后无法更改，快来和我聊天吧～
-        </div>
-        """, unsafe_allow_html=True)
+        # 保留st.info原生样式，只通过CSS间接压缩上下间距
+        st.info("👋 你好！我是你的AI智能伴侣，新建新对话时可在左侧修改我的设定，对话开始后无法更改，快来和我聊天吧～")
     else:
         for message in st.session_state.messages:
             if message["role"] == "user":
