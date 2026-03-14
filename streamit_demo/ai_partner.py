@@ -338,8 +338,8 @@ else:
     st.markdown("""
         <style>
         .title {
-            margin-top: -50px;  /* 负数表示向上移动，数值越大移动越多 */
-            margin-bottom: 20px; /* 可选：调整标题下方间距 */
+            margin-top: -70px;  /* 负数表示向上移动，数值越大移动越多 */
+            margin-bottom: 20px;
         }
         </style>
     """, unsafe_allow_html=True)
