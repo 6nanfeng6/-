@@ -353,7 +353,7 @@ else:
 
     # 显示聊天记录（完全不变）
     if not st.session_state.messages:
-        st.info("👋 你好！我是你的AI智能伴侣！请在下方输入框提问，开始跟我对话吧～")
+        st.info("👋 你好！我是你的AI智能伴侣，新建新对话时可在左侧修改我的设定，对话开始后无法更改，快来和我聊天吧～")
     else:
         for message in st.session_state.messages:
             if message["role"] == "user":
