@@ -34,7 +34,7 @@ def save_chat():
 
 # 生成会话标识
 def session_name():
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return datetime.now().strftime("%Y-%m-%d_%H+8-%M-%S")
 
 #加载所有会话列表信息
 def load_sessions():
