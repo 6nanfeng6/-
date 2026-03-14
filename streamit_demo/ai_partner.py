@@ -339,7 +339,7 @@ else:
     <style>
     /* 1. 压缩页面整体顶部空白 */
     .block-container {
-        padding-top: 0.5rem !important;  /* 大幅减少顶部padding，默认是2rem */
+        padding-top: 1rem !important;  /* 大幅减少顶部padding，默认是2rem */
         padding-bottom: 1rem !important;
     }
     /* 2. 压缩标题的上下间距 */
