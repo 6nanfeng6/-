@@ -366,19 +366,11 @@ else:
                             key=f"load_{session}_{idx}",  # 加idx避免key重复
                             type="primary" if session == st.session_state.session_name else "secondary"):
                     load_session(st.session_state.current_user, session)
-            with col2:
-                # 删除按钮加确认，防止误删
-                if st.button("", icon="❌", key=f"delete_{session}_{idx}",  # 加idx避免key重复
-                           use_container_width=True):
-                    # 二次确认
-                    if st.session_state.get(f"confirm_delete_{session}", False):
-                        delete_session(st.session_state.current_user, session)
-                        # 清空确认状态
-                        st.session_state[f"confirm_delete_{session}"] = False
-                    else:
-                        st.session_state[f"confirm_delete_{session}"] = True
-                        st.warning(f"请再次点击 ❌ 确认删除会话：{session}")
-                        st.rerun()
+            with col2:  
+            # 删除按钮，一次点击直接删除
+            if st.button("", icon="❌", key=f"delete_{session}_{idx}",
+                    use_container_width=True):
+                delete_session(st.session_state.current_user, session)
 
         st.divider()
         # AI角色设置（真正实时同步版）
