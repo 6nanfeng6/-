@@ -291,22 +291,36 @@ if not st.session_state.is_login:
                     st.error(msg)
 
     with tab2:
-        st.subheader("用户注册")
-        reg_username = st.text_input("用户名", placeholder="设置用户名", key="reg_user")
-        reg_password = st.text_input("密码", placeholder="设置密码", type="password", key="reg_pwd")
-        reg_confirm = st.text_input("确认密码", placeholder="再次输入密码", type="password", key="reg_confirm")
+    st.subheader("用户注册")
+    reg_username = st.text_input("用户名", placeholder="设置用户名", key="reg_user")
+    reg_password = st.text_input("密码", placeholder="设置密码", type="password", key="reg_pwd")
+    reg_confirm = st.text_input("确认密码", placeholder="再次输入密码", type="password", key="reg_confirm")
 
-        if st.button("注册", use_container_width=True):
-            if not reg_username or not reg_password:
-                st.warning("用户名和密码不能为空！")
-            elif reg_password != reg_confirm:
-                st.warning("两次密码不一致！")
+    if st.button("注册", use_container_width=True):
+        if not reg_username or not reg_password:
+            st.warning("用户名和密码不能为空！")
+        elif reg_password != reg_confirm:
+            st.warning("两次密码不一致！")
+        else:
+            success, msg = register_user(reg_username, reg_password)
+            if success:
+                # 优化：注册成功后，醒目的提示+引导返回登录
+                st.success(f"{msg} 即将为您切换到登录页～")
+                # 延迟1秒后自动切换到登录标签（核心优化）
+                st.markdown("""
+                <script>
+                // 自动切换到第一个标签（登录标签）
+                setTimeout(function(){
+                    document.querySelector('[data-testid="stTab"]:nth-child(1)').click();
+                }, 1000);
+                </script>
+                """, unsafe_allow_html=True)
+                # 清空注册表单（可选，提升体验）
+                st.session_state.reg_user = ""
+                st.session_state.reg_pwd = ""
+                st.session_state.reg_confirm = ""
             else:
-                success, msg = register_user(reg_username, reg_password)
-                if success:
-                    st.success(msg)
-                else:
-                    st.error(msg)
+                st.error(msg)
 
     with tab3:
         st.subheader("重置密码")
@@ -395,7 +409,7 @@ else:
     # 显示聊天记录（关键：用st.info保留欢迎语原有背景样式，仅调整位置）
     if len(st.session_state.messages) == 0:
         # 无对话：显示欢迎语（保留原生st.info样式）
-        st.info("👋 你好！我是你的AI智能伴侣，新建新对话时可在左侧修改我的设定，对话开始后无法更改，快来和我聊天吧～")
+        st.info("👋 你好！我是你的AI智能伴侣，创建新对话时可在左侧修改我的设定，对话开始后无法更改，快来和我聊天吧～")
     else:
         # 有对话：只显示聊天记录，不显示欢迎语
         for message in st.session_state.messages:
