@@ -1,3 +1,0 @@
-# requirements.txt
-streamlit>=1.0.0
-openai>=1.0.0  # 必须包含这一行，指定openai库的版本
