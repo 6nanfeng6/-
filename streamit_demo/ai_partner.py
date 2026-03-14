@@ -12,7 +12,7 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-# 设置页面配置（完全不变）
+# 设置页面配置
 st.set_page_config(
     page_title="AI智能伴侣",
     page_icon="🎓",
@@ -21,16 +21,16 @@ st.set_page_config(
     menu_items={}
 )
 
-# -------------------------- 常量定义（完全不变） --------------------------
+# -------------------------- 常量定义 --------------------------
 DEFAULT_AI_NAME = "小甜甜"
 DEFAULT_AI_CHARACTER = "你是一个少女，很贴心的回复用户的问题"
-CACHE_TTL = 5  # 新增：会话列表缓存5秒，减少文件读取
+CACHE_TTL = 5  # 会话列表缓存5秒，减少文件读取
 
-# -------------------------- 工具函数（完全不变） --------------------------
+# -------------------------- 工具函数 --------------------------
 def safe_get_session_state(key, default_value=""):
     return st.session_state[key] if key in st.session_state else default_value
 
-# -------------------------- 新增：缓存装饰器（不影响功能） --------------------------
+# -------------------------- 缓存装饰器 --------------------------
 def cache_with_ttl(ttl):
     """简单缓存，减少重复读文件"""
     cache = {}
@@ -46,7 +46,7 @@ def cache_with_ttl(ttl):
         return wrapper
     return decorator
 
-# -------------------------- 用户认证函数（完全不变） --------------------------
+# -------------------------- 用户认证函数 --------------------------
 def encrypt_password(password):
     return hashlib.md5(password.encode('utf-8')).hexdigest()
 
@@ -140,7 +140,7 @@ def save_user_character(username, ai_name, ai_character):
     except Exception:
         st.error("角色设定保存失败")
 
-# -------------------------- 会话相关函数（仅优化保存/读取逻辑，功能不变） --------------------------
+# -------------------------- 会话相关函数 --------------------------
 def save_chat(username):
     """优化：内容无变化时不保存，减少磁盘IO"""
     session_name_val = safe_get_session_state("session_name")
@@ -158,7 +158,7 @@ def save_chat(username):
             os.makedirs(user_session_dir)
         file_path = f"{user_session_dir}/{session_data['session_name']}.json"
         
-        # 新增：内容没变就不写文件
+        # 内容没变就不写文件
         try:
             if os.path.exists(file_path):
                 with open(file_path, "r", encoding="utf-8") as f:
@@ -177,7 +177,7 @@ def generate_session_name():
     local_time = datetime.now() + timedelta(hours=8)
     return local_time.strftime("%Y-%m-%d_%H-%M-%S")
 
-@cache_with_ttl(CACHE_TTL)  # 新增：缓存会话列表，5秒内不重复读文件夹
+@cache_with_ttl(CACHE_TTL)
 def load_sessions(username):
     session_list = []
     user_session_dir = f"session/{username}"
@@ -200,6 +200,11 @@ def load_session(username, session_name):
             st.session_state.AI_name = session_data.get("AI_name", DEFAULT_AI_NAME)
             st.session_state.AI_character = session_data.get("AI_character", DEFAULT_AI_CHARACTER)
             st.session_state.messages = session_data["messages"]
+            # 加载会话时重置生成状态
+            st.session_state.stop_ai = False
+            st.session_state.ai_generating = False
+            st.session_state.user_input = ""
+            st.session_state.current_ai_reply = ""
             st.success(f"已加载会话：{session_name}")
             st.rerun()
     except Exception as e:
@@ -221,6 +226,11 @@ def delete_session(username, session_name):
             st.session_state.session_name = generate_session_name()
             st.session_state.AI_name = DEFAULT_AI_NAME
             st.session_state.AI_character = DEFAULT_AI_CHARACTER
+            # 重置生成状态
+            st.session_state.stop_ai = False
+            st.session_state.ai_generating = False
+            st.session_state.user_input = ""
+            st.session_state.current_ai_reply = ""
         
         st.success(f"会话 {session_name} 已成功删除！")
         st.rerun()
@@ -238,11 +248,16 @@ def create_new_session(username):
     st.session_state.session_name = generate_session_name()
     st.session_state.AI_name = DEFAULT_AI_NAME
     st.session_state.AI_character = DEFAULT_AI_CHARACTER
+    # 重置生成状态
+    st.session_state.stop_ai = False
+    st.session_state.ai_generating = False
+    st.session_state.user_input = ""
+    st.session_state.current_ai_reply = ""
     save_chat(username)
     st.success("已创建新会话！")
     st.rerun()
 
-# -------------------------- 登录状态初始化（新增保存标记，不影响功能） --------------------------
+# -------------------------- 登录状态初始化 --------------------------
 if "is_login" not in st.session_state:
     st.session_state.is_login = False
 if "current_user" not in st.session_state:
@@ -251,22 +266,24 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "session_name" not in st.session_state:
     st.session_state.session_name = generate_session_name()
-# 新增：记录最后一次保存的角色信息，避免重复保存
 if "last_ai_name" not in st.session_state:
     st.session_state.last_ai_name = DEFAULT_AI_NAME
 if "last_ai_char" not in st.session_state:
     st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
-# ===== 新增：核心状态初始化 =====
+
+# -------------------------- 生成状态初始化（核心新增） --------------------------
 if "stop_ai" not in st.session_state:
     st.session_state.stop_ai = False  # 停止信号
 if "ai_generating" not in st.session_state:
-    st.session_state.ai_generating = False  # AI是否正在生成
-if "current_ai_response" not in st.session_state:
-    st.session_state.current_ai_response = ""  # 保存实时生成的内容
-if "response_placeholder" not in st.session_state:
-    st.session_state.response_placeholder = None  # AI回复占位符
+    st.session_state.ai_generating = False  # AI是否生成中
+if "user_input" not in st.session_state:
+    st.session_state.user_input = ""  # 保存用户输入内容
+if "current_ai_reply" not in st.session_state:
+    st.session_state.current_ai_reply = ""  # 实时AI回复
+if "ai_placeholder" not in st.session_state:
+    st.session_state.ai_placeholder = None  # AI回复占位符
 
-# -------------------------- 未登录界面（完全不变） --------------------------
+# -------------------------- 未登录界面 --------------------------
 if not st.session_state.is_login:
     if "AI_name" in st.session_state:
         del st.session_state.AI_name
@@ -336,7 +353,7 @@ if not st.session_state.is_login:
                 else:
                     st.error(msg)
 
-# -------------------------- 已登录主界面（仅优化角色保存逻辑，功能/界面不变） --------------------------
+# -------------------------- 已登录主界面（核心修改） --------------------------
 else:
     if "AI_name" not in st.session_state:
         st.session_state.AI_name = DEFAULT_AI_NAME
@@ -345,7 +362,7 @@ else:
 
     st.title("AI智能伴侣")
 
-    # Logo加载（完全不变）
+    # Logo加载
     logo_file = "3.png"
     current_dir = os.path.dirname(os.path.abspath(__file__))
     logo_path = os.path.join(current_dir, logo_file)
@@ -360,16 +377,108 @@ else:
 
     st.text(f"当前用户: {st.session_state.current_user} | 会话名称: {st.session_state.session_name}")
 
-    # 显示聊天记录（完全不变）
+    # 显示历史聊天记录
     if not st.session_state.messages:
         st.info("👋 你好！我是你的AI智能伴侣！请在下方输入框提问，开始跟我对话吧～")
     else:
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                st.chat_message("user").write(message["content"])
-            else:
-                st.chat_message("assistant").write(message["content"])
+        for msg in st.session_state.messages:
+            if msg["role"] == "user":
+                st.chat_message("user").write(msg["content"])
+            elif msg["role"] == "assistant":
+                # 跳过正在生成的回复（避免重复显示）
+                if msg["content"] != st.session_state.current_ai_reply:
+                    st.chat_message("assistant").write(msg["content"])
 
+    # ===== 核心：自定义聊天输入区域（替代st.chat_input）=====
+    st.divider()
+    col_input, col_btn = st.columns([9, 1])
+    with col_input:
+        # 输入框：生成中时禁用，否则可输入
+        user_input = st.text_input(
+            label="聊天输入",
+            value=st.session_state.user_input,
+            placeholder="请输入您要问的问题：" if not st.session_state.ai_generating else "AI正在回复中...",
+            disabled=st.session_state.ai_generating,
+            label_visibility="collapsed",
+            key="custom_input"
+        )
+        st.session_state.user_input = user_input  # 实时保存输入内容
+
+    with col_btn:
+        # 按钮：动态切换「发送」/「停止」
+        btn_label = "停止" if st.session_state.ai_generating else "发送"
+        btn_type = "secondary" if st.session_state.ai_generating else "primary"
+        if st.button(
+            label=btn_label,
+            type=btn_type,
+            use_container_width=True,
+            key="custom_btn"
+        ):
+            if st.session_state.ai_generating:
+                # 点击「停止」按钮：触发停止信号
+                st.session_state.stop_ai = True
+            else:
+                # 点击「发送」按钮：开始AI回复
+                if user_input.strip() == "":
+                    st.warning("请输入内容后再发送！")
+                else:
+                    # 重置状态
+                    st.session_state.stop_ai = False
+                    st.session_state.current_ai_reply = ""
+                    st.session_state.ai_generating = True
+                    
+                    # 显示用户消息
+                    st.chat_message("user").write(user_input)
+                    st.session_state.messages.append({"role": "user", "content": user_input})
+                    
+                    # 清空输入框
+                    st.session_state.user_input = ""
+                    st.rerun()
+
+    # ===== AI生成回复逻辑 =====
+    if st.session_state.ai_generating and not st.session_state.stop_ai:
+        # 构建系统提示词
+        system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
+        try:
+            # 调用DeepSeek API
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
+                stream=True,
+                max_tokens=2000
+            )
+
+            # 创建AI回复占位符
+            ai_placeholder = st.chat_message("assistant").empty()
+
+            # 流式生成：生成多少显示多少
+            for chunk in response:
+                # 检测停止信号，立即终止
+                if st.session_state.stop_ai:
+                    st.warning("已停止AI回复生成")
+                    break
+                
+                if chunk.choices[0].delta.content is not None:
+                    st.session_state.current_ai_reply += chunk.choices[0].delta.content
+                    # 实时更新显示
+                    ai_placeholder.write(st.session_state.current_ai_reply)
+
+            # 保存已生成的内容（停止也保存）
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": st.session_state.current_ai_reply  # 只保存实际生成的内容
+            })
+            save_chat(st.session_state.current_user)
+
+        except Exception as e:
+            st.error(f"AI响应失败：{str(e)}")
+        finally:
+            # 重置状态，恢复发送按钮
+            st.session_state.ai_generating = False
+            st.session_state.stop_ai = False
+            st.rerun()
+
+    # ===== 侧边栏 =====
     with st.sidebar:
         st.subheader(f"当前用户：{st.session_state.current_user}")
         if st.button("退出登录", type="secondary", use_container_width=True, icon="🚪"):
@@ -379,6 +488,10 @@ else:
             st.session_state.session_name = generate_session_name()
             st.session_state.last_ai_name = DEFAULT_AI_NAME
             st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
+            st.session_state.stop_ai = False
+            st.session_state.ai_generating = False
+            st.session_state.user_input = ""
+            st.session_state.current_ai_reply = ""
             if "AI_name" in st.session_state:
                 del st.session_state.AI_name
             if "AI_character" in st.session_state:
@@ -391,14 +504,14 @@ else:
         if st.button("新建会话", width="stretch", icon="📝"):
             create_new_session(st.session_state.current_user)
 
-        # 会话历史（优化按钮key，减少重复渲染）
+        # 会话历史
         st.text("会话历史")
         session_list = load_sessions(st.session_state.current_user)
         for session in session_list:
             col1, col2 = st.columns([4, 1])
             with col1:
                 if st.button(session, width="stretch", icon="💬", 
-                            key=f"load_{session}",  # 固定key，不随idx变
+                            key=f"load_{session}",
                             type="primary" if session == st.session_state.session_name else "secondary"):
                     load_session(st.session_state.current_user, session)
             with col2:  
@@ -407,10 +520,9 @@ else:
                     delete_session(st.session_state.current_user, session)
 
         st.divider()
-        # AI角色设置（优化：仅内容真正变化时才保存，打字不卡）
+        # AI角色设置
         st.subheader("伴侣信息")
 
-        # 完全保留你的原始key逻辑，界面/交互不变
         ai_name_key = f"ai_name_{st.session_state.session_name}"
         ai_char_key = f"ai_char_{st.session_state.session_name}"
 
@@ -427,7 +539,7 @@ else:
             key=ai_char_key
         )
 
-        # 优化：仅当内容真正变化时才更新+保存，避免每打一个字都保存
+        # 仅当内容真正变化时才保存
         save_needed = False
         if AI_name != st.session_state.last_ai_name:
             st.session_state.AI_name = AI_name
@@ -438,91 +550,5 @@ else:
             st.session_state.last_ai_char = character
             save_needed = True
         
-        # 批量保存，减少IO次数
         if save_needed:
             save_chat(st.session_state.current_user)
-
-    # ===== 核心：模拟豆包式「发送→停止」按钮切换 =====
-    # 1. 动态控制聊天输入框
-    if st.session_state.ai_generating:
-        # AI生成中：输入框禁用，按钮变成「停止」功能（视觉上就是停止按钮）
-        chat_input = st.chat_input(
-            placeholder="AI正在回复中...",
-            disabled=True,  # 输入框禁用，只能点按钮
-            key="chat_input_stop"
-        )
-        # 点击"停止"按钮（实际是禁用的输入框按钮）
-        if chat_input is not None:
-            st.session_state.stop_ai = True
-    else:
-        # 正常状态：输入框可用，按钮是「发送」功能
-        chat_input = st.chat_input(
-            placeholder="请输入您要问的问题：",
-            key="chat_input_send"
-        )
-        # 点击"发送"按钮
-        if chat_input:
-            # 重置状态
-            st.session_state.stop_ai = False
-            st.session_state.current_ai_response = ""
-            st.session_state.ai_generating = True
-            
-            # 显示用户消息
-            st.chat_message("user").write(chat_input)
-            st.session_state.messages.append({"role": "user", "content": chat_input})
-            
-            # 立即刷新页面，让输入框变成"停止"状态
-            st.rerun()
-    
-    # 2. AI生成逻辑（独立运行，不阻塞）
-    if st.session_state.ai_generating and not st.session_state.stop_ai:
-        # 构建系统提示词
-        system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
-        try:
-            # 调用DeepSeek API
-            response = client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages],
-                stream=True,
-                max_tokens=2000
-            )
-    
-            # 创建AI回复占位符（只创建一次）
-            if not st.session_state.response_placeholder:
-                st.session_state.response_placeholder = st.chat_message("assistant").empty()
-    
-            # 流式生成+实时更新
-            for chunk in response:
-                # 检测停止信号，立即终止
-                if st.session_state.stop_ai:
-                    break
-                
-                if chunk.choices[0].delta.content is not None:
-                    # 累加生成的内容
-                    st.session_state.current_ai_response += chunk.choices[0].delta.content
-                    # 实时更新显示（生成多少显示多少）
-                    st.session_state.response_placeholder.write(st.session_state.current_ai_response)
-    
-            # 3. 停止/完成后：保存已生成的内容，重置状态
-            # 把生成多少就保存多少
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": st.session_state.current_ai_response  # 只保存实际生成的内容
-            })
-            save_chat(st.session_state.current_user)
-    
-        except Exception as e:
-            st.error(f"AI响应失败：{str(e)}")
-        finally:
-            # 重置所有状态，恢复发送按钮
-            st.session_state.ai_generating = False
-            st.session_state.stop_ai = False
-            st.session_state.response_placeholder = None
-            st.rerun()  # 刷新恢复正常输入框
-    
-    # ===== 显示历史聊天记录 =====
-    for msg in st.session_state.messages:
-        if msg["role"] == "user":
-            st.chat_message("user").write(msg["content"])
-        elif msg["role"] == "assistant" and msg["content"] != st.session_state.current_ai_response:
-            st.chat_message("assistant").write(msg["content"])
