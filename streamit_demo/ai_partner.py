@@ -13,7 +13,7 @@ client = OpenAI(
 
 # 设置页面配置
 st.set_page_config(
-    page_title="AI智能助手",
+    page_title="AI智能伴侣",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -108,8 +108,8 @@ def reset_password(username, new_password):
 
     return True, "密码重置成功！"
 
-# 保存用户角色设定
-def save_user_character(username, ai_name, ai_character):
+# 保存用户默认角色设定（仅用于新建会话的初始值）
+def save_user_default_character(username, ai_name, ai_character):
     try:
         init_user_db()
         with open("user_data/users.json", "r", encoding="utf-8") as f:
@@ -163,8 +163,8 @@ def load_session(username, session_name):
             with open(file_path, "r", encoding="utf-8") as f:
                 session_data = json.load(f)
             st.session_state.session_name = session_data["session_name"]
-            st.session_state.AI_name = session_data["AI_name"]
-            st.session_state.AI_character = session_data["AI_character"]
+            st.session_state.AI_name = session_data["AI_name"]  # 加载会话专属名称
+            st.session_state.AI_character = session_data["AI_character"]  # 加载会话专属设定
             st.session_state.messages = session_data["messages"]
     except Exception:
         st.error("会话加载失败")
@@ -218,8 +218,8 @@ if not st.session_state.is_login:
                 if success:
                     st.session_state.is_login = True
                     st.session_state.current_user = login_username
-                    st.session_state.AI_name = ai_name
-                    st.session_state.AI_character = ai_char
+                    st.session_state.AI_name = ai_name  # 初始化为用户默认名称
+                    st.session_state.AI_character = ai_char  # 初始化为用户默认设定
                     st.success(msg)
                     st.rerun()
                 else:
@@ -316,9 +316,16 @@ else:
         st.divider()
         st.subheader("AI控制面板")
 
-        # 新建会话
+        # 新建会话：重置为用户默认的伴侣信息
         if st.button("新建会话", width="stretch", icon="📝"):
             save_chat(st.session_state.current_user)
+            # 读取用户默认的伴侣信息
+            with open("user_data/users.json", "r", encoding="utf-8") as f:
+                users = json.load(f)
+            users = upgrade_user_data(st.session_state.current_user, users)
+            # 初始化新会话的伴侣信息为用户默认值
+            st.session_state.AI_name = users[st.session_state.current_user]["AI_name"]
+            st.session_state.AI_character = users[st.session_state.current_user]["AI_character"]
             st.session_state.messages = []
             st.session_state.session_name = session_name()
             save_chat(st.session_state.current_user)
@@ -332,7 +339,7 @@ else:
             with col1:
                 if st.button(session, width="stretch", icon="💬", key=f"load_{session}",
                             type="primary" if session == st.session_state.session_name else "secondary"):
-                    load_session(st.session_state.current_user, session)
+                    load_session(st.session_state.current_user, session)  # 加载会话时自动同步伴侣信息
                     st.rerun()
             with col2:
                 if st.button("", icon="❌", key=f"delete_{session}"):
@@ -340,7 +347,7 @@ else:
                     st.rerun()
 
         st.divider()
-        # AI角色设置（带兜底值）
+        # AI角色设置（实时保存到当前会话）
         st.subheader("伴侣信息")
         AI_name = st.text_input(
             "名称", 
@@ -355,13 +362,14 @@ else:
             key=f"ai_char_{st.session_state.current_user}"
         )
 
-        # 实时更新并持久化
+        # 核心修改：修改伴侣信息时，只更新当前会话，不覆盖用户默认值
+        # 实时更新会话状态 + 保存到当前会话文件
         if AI_name != st.session_state.AI_name:
             st.session_state.AI_name = AI_name
-            save_user_character(st.session_state.current_user, AI_name, st.session_state.AI_character)
+            save_chat(st.session_state.current_user)  # 保存到会话文件
         if character != st.session_state.AI_character:
             st.session_state.AI_character = character
-            save_user_character(st.session_state.current_user, st.session_state.AI_name, character)
+            save_chat(st.session_state.current_user)  # 保存到会话文件
 
     # 消息输入框+AI交互
     prompt = st.chat_input("请输入您要问的问题：")
