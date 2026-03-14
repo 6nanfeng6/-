@@ -292,6 +292,7 @@ if not st.session_state.is_login:
 
     with tab2:
         st.subheader("用户注册")
+        # 仅保留基础输入框，不绑定动态value，避免状态冲突
         reg_username = st.text_input("用户名", placeholder="设置用户名", key="reg_user")
         reg_password = st.text_input("密码", placeholder="设置密码", type="password", key="reg_pwd")
         reg_confirm = st.text_input("确认密码", placeholder="再次输入密码", type="password", key="reg_confirm")
@@ -304,13 +305,10 @@ if not st.session_state.is_login:
             else:
                 success, msg = register_user(reg_username, reg_password)
                 if success:
-                    # 纯文字提示，更醒目
+                    # 仅显示提示，不修改任何session_state，不触发JS
                     st.success(msg)
-                    st.info("✅ 请点击左侧「登录」标签，使用新注册的账号登录～", icon="👉")
-                    # 清空表单
-                    st.session_state.reg_user = ""
-                    st.session_state.reg_pwd = ""
-                    st.session_state.reg_confirm = ""
+                    # 醒目的纯文字引导，无任何状态修改/JS操作
+                    st.info("✅ 注册成功！请点击左侧「登录」标签，使用新账号登录～", icon="👉")
                 else:
                     st.error(msg)
 
