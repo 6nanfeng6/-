@@ -384,10 +384,11 @@ else:
     """, unsafe_allow_html=True)
 
     # 显示聊天记录（关键：用st.info保留欢迎语原有背景样式，仅调整位置）
-    if not st.session_state.messages:
-        # 保留st.info原生样式，只通过CSS间接压缩上下间距
+    if len(st.session_state.messages) == 0:
+        # 无对话：显示欢迎语（保留原生st.info样式）
         st.info("👋 你好！我是你的AI智能伴侣，新建新对话时可在左侧修改我的设定，对话开始后无法更改，快来和我聊天吧～")
     else:
+        # 有对话：只显示聊天记录，不显示欢迎语
         for message in st.session_state.messages:
             if message["role"] == "user":
                 st.chat_message("user").write(message["content"])
