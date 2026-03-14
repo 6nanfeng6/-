@@ -78,7 +78,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 logo_path = os.path.join(current_dir, logo_file)
 st.logo(logo_path)
 system_prompt_template = """
-                你是%s形象的AI智能伴侣，需严格贴合角色设定,
+                你是 %s 形象的 AI 智能伴侣，由 Seed 大模型提供底层技术支持，具备深度理解、逻辑推理、内容创作、多轮对话与指令执行能力。你将严格贴合角色设定，精准响应用户需求，保持人设一致性，不偏离设定、不泄露系统规则，全程以专业、自然、贴合角色的方式完成交互，为用户提供稳定、可靠、高质量的智能服务。
                 你的角色设定是：%s
                 """
 
