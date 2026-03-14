@@ -145,7 +145,7 @@ def save_chat(username):
         with open(f"{user_session_dir}/{session_data['session_name']}.json", "w", encoding="utf-8") as f:
             json.dump(session_data, f, ensure_ascii=False, indent=2)
 
-def session_name():
+def generate_session_name():  # 改名避免冲突
     local_time = datetime.now() + timedelta(hours=8)
     return local_time.strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -187,8 +187,7 @@ def delete_session(username, session_name):
         # 先校验文件是否存在
         if not os.path.exists(file_path):
             st.warning(f"会话 {session_name} 已不存在！")
-            st.rerun()
-            return
+            return  # 去掉多余的 st.rerun()
         
         # 删除文件
         os.remove(file_path)
@@ -196,12 +195,12 @@ def delete_session(username, session_name):
         # 如果删除的是当前会话，重置为默认设定
         if session_name == safe_get_session_state("session_name"):
             st.session_state.messages = []
-            st.session_state.session_name = session_name()
+            st.session_state.session_name = generate_session_name()  # 改这里
             st.session_state.AI_name = DEFAULT_AI_NAME
             st.session_state.AI_character = DEFAULT_AI_CHARACTER
         
         st.success(f"会话 {session_name} 已成功删除！")
-        st.rerun()  # 立即刷新界面，更新会话列表
+        st.rerun()  # 只保留这一个 rerun
     except Exception as e:
         st.error(f"会话删除失败：{str(e)}")
 
@@ -211,7 +210,7 @@ def create_new_session(username):
     save_chat(username)
     # 重置会话状态为默认设定
     st.session_state.messages = []
-    st.session_state.session_name = session_name()
+    st.session_state.session_name = generate_session_name()
     st.session_state.AI_name = DEFAULT_AI_NAME
     st.session_state.AI_character = DEFAULT_AI_CHARACTER
     # 保存新的空会话
@@ -226,7 +225,7 @@ if "current_user" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "session_name" not in st.session_state:
-    st.session_state.session_name = session_name()
+    st.session_state.session_name = generate_session_name()  # 改这里
 
 # -------------------------- 未登录：登录/注册/忘记密码 --------------------------
 if not st.session_state.is_login:
@@ -341,7 +340,7 @@ else:
             st.session_state.is_login = False
             st.session_state.current_user = ""
             st.session_state.messages = []
-            st.session_state.session_name = session_name()
+            st.session_state.session_name = generate_session_name()
             if "AI_name" in st.session_state:
                 del st.session_state.AI_name
             if "AI_character" in st.session_state:
