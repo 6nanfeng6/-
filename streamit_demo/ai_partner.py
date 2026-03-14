@@ -179,20 +179,31 @@ def load_session(username, session_name):
         st.error(f"会话加载失败：{str(e)}")
 
 def delete_session(username, session_name):
+    """删除指定会话，增加状态校验和即时刷新"""
     try:
         user_session_dir = f"session/{username}"
         file_path = f"{user_session_dir}/{session_name}.json"
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            if session_name == safe_get_session_state("session_name"):
-                # 删除当前会话后，重置为默认设定
-                st.session_state.messages = []
-                st.session_state.session_name = session_name()
-                st.session_state.AI_name = DEFAULT_AI_NAME
-                st.session_state.AI_character = DEFAULT_AI_CHARACTER
-                st.rerun()
-    except Exception:
-        st.error("会话删除失败")
+        
+        # 先校验文件是否存在
+        if not os.path.exists(file_path):
+            st.warning(f"会话 {session_name} 已不存在！")
+            st.rerun()
+            return
+        
+        # 删除文件
+        os.remove(file_path)
+        
+        # 如果删除的是当前会话，重置为默认设定
+        if session_name == safe_get_session_state("session_name"):
+            st.session_state.messages = []
+            st.session_state.session_name = session_name()
+            st.session_state.AI_name = DEFAULT_AI_NAME
+            st.session_state.AI_character = DEFAULT_AI_CHARACTER
+        
+        st.success(f"会话 {session_name} 已成功删除！")
+        st.rerun()  # 立即刷新界面，更新会话列表
+    except Exception as e:
+        st.error(f"会话删除失败：{str(e)}")
 
 def create_new_session(username):
     """创建新会话，强制使用默认角色设定"""
@@ -347,15 +358,27 @@ else:
         # 会话历史
         st.text("会话历史")
         session_list = load_sessions(st.session_state.current_user)
-        for session in session_list:
+        # 给会话列表加个唯一key，确保刷新
+        for idx, session in enumerate(session_list):
             col1, col2 = st.columns([4, 1])
             with col1:
-                if st.button(session, width="stretch", icon="💬", key=f"load_{session}",
+                if st.button(session, width="stretch", icon="💬", 
+                            key=f"load_{session}_{idx}",  # 加idx避免key重复
                             type="primary" if session == st.session_state.session_name else "secondary"):
                     load_session(st.session_state.current_user, session)
             with col2:
-                if st.button("", icon="❌", key=f"delete_{session}"):
-                    delete_session(st.session_state.current_user, session)
+                # 删除按钮加确认，防止误删
+                if st.button("", icon="❌", key=f"delete_{session}_{idx}",  # 加idx避免key重复
+                           use_container_width=True):
+                    # 二次确认
+                    if st.session_state.get(f"confirm_delete_{session}", False):
+                        delete_session(st.session_state.current_user, session)
+                        # 清空确认状态
+                        st.session_state[f"confirm_delete_{session}"] = False
+                    else:
+                        st.session_state[f"confirm_delete_{session}"] = True
+                        st.warning(f"请再次点击 ❌ 确认删除会话：{session}")
+                        st.rerun()
 
         st.divider()
         # AI角色设置（真正实时同步版）
