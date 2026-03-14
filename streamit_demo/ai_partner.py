@@ -256,8 +256,6 @@ if "last_ai_name" not in st.session_state:
     st.session_state.last_ai_name = DEFAULT_AI_NAME
 if "last_ai_char" not in st.session_state:
     st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
-if "reg_success" not in st.session_state:
-    st.session_state.reg_success = False
 
 # -------------------------- 未登录界面（完全不变） --------------------------
 if not st.session_state.is_login:
@@ -294,32 +292,11 @@ if not st.session_state.is_login:
 
     with tab2:
         st.subheader("用户注册")
-        # 核心修改：根据reg_success标记设置输入框默认值（实现清空）
-        reg_username = st.text_input(
-            "用户名", 
-            placeholder="设置用户名", 
-            key="reg_user",
-            value="" if st.session_state.reg_success else st.session_state.get("reg_user", "")
-        )
-        reg_password = st.text_input(
-            "密码", 
-            placeholder="设置密码", 
-            type="password", 
-            key="reg_pwd",
-            value="" if st.session_state.reg_success else st.session_state.get("reg_pwd", "")
-        )
-        reg_confirm = st.text_input(
-            "确认密码", 
-            placeholder="再次输入密码", 
-            type="password", 
-            key="reg_confirm",
-            value="" if st.session_state.reg_success else st.session_state.get("reg_confirm", "")
-        )
-
+        reg_username = st.text_input("用户名", placeholder="设置用户名", key="reg_user")
+        reg_password = st.text_input("密码", placeholder="设置密码", type="password", key="reg_pwd")
+        reg_confirm = st.text_input("确认密码", placeholder="再次输入密码", type="password", key="reg_confirm")
+    
         if st.button("注册", use_container_width=True):
-            # 重置标记（避免页面刷新后一直清空）
-            st.session_state.reg_success = False
-            
             if not reg_username or not reg_password:
                 st.warning("用户名和密码不能为空！")
             elif reg_password != reg_confirm:
@@ -327,20 +304,13 @@ if not st.session_state.is_login:
             else:
                 success, msg = register_user(reg_username, reg_password)
                 if success:
-                    # 1. 设置注册成功标记（用于清空表单）
-                    st.session_state.reg_success = True
-                    # 2. 醒目的提示
-                    st.success(f"{msg} 即将为您切换到登录页～")
-                    # 3. 自动切换到登录标签（兼容云端）
-                    st.markdown("""
-                    <script>
-                    setTimeout(function(){
-                        document.querySelector('[data-testid="stTab"]:nth-child(1)').click();
-                    }, 1000);
-                    </script>
-                    """, unsafe_allow_html=True)
-                    # 4. 触发页面重新渲染（使输入框清空生效）
-                    st.rerun()
+                    # 纯文字提示，更醒目
+                    st.success(msg)
+                    st.info("✅ 请点击左侧「登录」标签，使用新注册的账号登录～", icon="👉")
+                    # 清空表单
+                    st.session_state.reg_user = ""
+                    st.session_state.reg_pwd = ""
+                    st.session_state.reg_confirm = ""
                 else:
                     st.error(msg)
 
