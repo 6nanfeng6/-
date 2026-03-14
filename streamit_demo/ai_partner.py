@@ -256,6 +256,8 @@ if "last_ai_name" not in st.session_state:
     st.session_state.last_ai_name = DEFAULT_AI_NAME
 if "last_ai_char" not in st.session_state:
     st.session_state.last_ai_char = DEFAULT_AI_CHARACTER
+if "stop_generation" not in st.session_state:
+    st.session_state.stop_generation = False
 
 # -------------------------- 未登录界面（完全不变） --------------------------
 if not st.session_state.is_login:
@@ -433,12 +435,13 @@ else:
         if save_needed:
             save_chat(st.session_state.current_user)
 
-    # 消息输入框+AI交互（完全不变）
+    # 消息输入框+AI交互（新增打断功能）
     prompt = st.chat_input("请输入您要问的问题：")
     if prompt:
+        st.session_state.stop_generation = False  # 重置停止标记
         st.chat_message("user").write(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
-
+    
         system_prompt = system_prompt_template % (st.session_state.AI_name, st.session_state.AI_character)
         try:
             response = client.chat.completions.create(
@@ -447,17 +450,25 @@ else:
                 stream=True,
                 max_tokens=2000
             )
-
+    
+            # 显示停止按钮
+            stop_btn = st.button("⏹️ 停止生成", key="stop_btn")
+            if stop_btn:
+                st.session_state.stop_generation = True
+    
             def stream_generator():
                 full_response = ""
                 for chunk in response:
+                    # 检测是否要打断
+                    if st.session_state.get("stop_generation", False):
+                        break
                     if chunk.choices[0].delta.content is not None:
                         content = chunk.choices[0].delta.content
                         full_response += content
                         yield content
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 save_chat(st.session_state.current_user)
-
+    
             st.chat_message("assistant").write_stream(stream_generator)
         except Exception as e:
             st.error(f"AI响应失败：{str(e)}")
