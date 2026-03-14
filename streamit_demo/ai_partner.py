@@ -131,19 +131,28 @@ def save_user_character(username, ai_name, ai_character):
 
 # -------------------------- 会话相关函数 --------------------------
 def save_chat(username):
-    """保存当前会话（包含当前会话的角色设定）"""
-    if safe_get_session_state("session_name") and username:
+    """保存当前会话（包含当前会话的角色设定）
+    新增逻辑：空会话（无消息）不保存
+    """
+    session_name_val = safe_get_session_state("session_name")
+    messages_val = safe_get_session_state("messages", [])
+    
+    # 新增判断：会话名称存在 + 非空会话 才保存
+    if session_name_val and username and messages_val:
         session_data = {
-            "session_name": safe_get_session_state("session_name"),
+            "session_name": session_name_val,
             "AI_name": safe_get_session_state("AI_name", DEFAULT_AI_NAME),
             "AI_character": safe_get_session_state("AI_character", DEFAULT_AI_CHARACTER),
-            "messages": safe_get_session_state("messages", [])
+            "messages": messages_val
         }
         user_session_dir = f"session/{username}"
         if not os.path.exists(user_session_dir):
             os.makedirs(user_session_dir)
         with open(f"{user_session_dir}/{session_data['session_name']}.json", "w", encoding="utf-8") as f:
             json.dump(session_data, f, ensure_ascii=False, indent=2)
+    elif session_name_val and username and not messages_val:
+        # 空会话不保存，仅提示（可选）
+        pass  # 也可以注释掉，静默不保存
 
 def generate_session_name():  # 改名避免冲突
     local_time = datetime.now() + timedelta(hours=8)
@@ -205,16 +214,26 @@ def delete_session(username, session_name):
         st.error(f"会话删除失败：{str(e)}")
 
 def create_new_session(username):
-    """创建新会话，强制使用默认角色设定"""
+    """创建新会话，强制使用默认角色设定
+    新增逻辑：如果当前会话是空的（无消息），则不创建新会话
+    """
+    # 核心判断：检查当前会话是否为空（messages为空列表）
+    current_messages = safe_get_session_state("messages", [])
+    if not current_messages:  # 如果当前会话没有任何聊天记录
+        st.info("当前会话为空，无需创建新会话！")
+        return  # 直接返回，不执行后续创建逻辑
+    
+    # 如果当前会话有内容，才执行新建会话逻辑
     # 保存当前会话（如果有）
     save_chat(username)
     # 重置会话状态为默认设定
     st.session_state.messages = []
-    st.session_state.session_name = generate_session_name()
+    st.session_state.session_name = generate_session_name()  # 注意这里要用改名后的函数
     st.session_state.AI_name = DEFAULT_AI_NAME
     st.session_state.AI_character = DEFAULT_AI_CHARACTER
-    # 保存新的空会话
+    # 保存新的空会话（此时新会话是空的，但因为是主动新建，保留这个逻辑）
     save_chat(username)
+    st.success("已创建新会话！")
     st.rerun()
 
 # -------------------------- 登录状态初始化 --------------------------
@@ -234,7 +253,7 @@ if not st.session_state.is_login:
     if "AI_character" in st.session_state:
         del st.session_state.AI_character
 
-    st.title("AI智能助手 - 用户登录")
+    st.title("AI智能伴侣 - 用户登录")
 
     tab1, tab2, tab3 = st.tabs(["登录", "注册", "忘记密码"])
 
