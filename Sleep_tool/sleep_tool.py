@@ -4,9 +4,17 @@ import matplotlib.pyplot as plt
 from datetime import time
 import os
 from openai import OpenAI
-from matplotlib import rcParams #字体
-# 设置中文字体
-rcParams['font.family'] = ['SimHei']
+from matplotlib import rcParams
+
+# ========== 修复中文显示（本地+云端通用）==========
+def set_chinese_font():
+    plt.rcParams['axes.unicode_minus'] = False
+    try:
+        plt.rcParams['font.family'] = 'WenQuanYi Zen Hei'
+    except:
+        plt.rcParams['font.family'] = 'SimHei'
+set_chinese_font()
+# ==============================================
 
 
 
