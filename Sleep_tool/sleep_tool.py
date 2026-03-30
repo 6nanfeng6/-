@@ -4,30 +4,21 @@ import matplotlib.pyplot as plt
 from datetime import time
 import os
 from openai import OpenAI
-import matplotlib.font_manager as fm
 
-# ===================== 强制全局中文字体（云端100%生效）=====================
+# ====================== 终极中文修复：只改这里 ======================
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 先禁用所有中文字体
 plt.rcParams['axes.unicode_minus'] = False
 
-# 下载并加载 SimHei 字体
-font_url = "https://cdn.jsdelivr.net/gh/StellarCN/scsl@master/SimHei.ttf"
-font_path = "/tmp/SimHei.ttf"
-
-if not os.path.exists(font_path):
-    try:
-        import urllib.request
-        urllib.request.urlretrieve(font_url, font_path)
-    except:
-        pass
-
-# 全局应用中文字体
-try:
-    font_prop = fm.FontProperties(fname=font_path)
-    plt.rcParams['font.family'] = font_prop.get_name()
-except:
-    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'SimHei', 'DejaVu Sans']
-# ==========================================================================
-
+import matplotlib
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = [
+    'WenQuanYi Zen Hei',
+    'SimHei',
+    'Microsoft YaHei',
+    'Arial Unicode MS',
+    'DejaVu Sans'
+]
+# ==================================================================
 
 # AI睡眠分析函数
 def ai_sleep_analysis_stream(duration, sleep_time):
