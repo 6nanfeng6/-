@@ -5,11 +5,9 @@ from datetime import time
 import os
 from openai import OpenAI
 
-# ============================
-# 🔥 云端永久中文正常显示
-# ============================
-plt.rcParams['font.family'] = ['WenQuanYi Zen Hei']
 plt.rcParams['axes.unicode_minus'] = False
+plt.rcParams['font.sans-serif'] = ["WenQuanYi Zen Hei", "SimHei", "Arial"]
+plt.rcParams['font.family'] = ["sans-serif"]
 plt.rcParams['figure.dpi'] = 100
 
 # AI睡眠分析函数
@@ -254,6 +252,7 @@ elif tab_choice == "睡眠分析":
 
         # 睡眠分析图表
         fig = plt.figure(figsize=(18, 10))
+        plt.rcParams["font.family"] = "sans-serif"
 
         # 先清理数据
         df_plot = df.dropna(subset=["睡眠时长(小时)", "睡眠评分", "入睡小时"]).copy()
