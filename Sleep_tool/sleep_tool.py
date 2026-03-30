@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 from datetime import time
 import os
 from openai import OpenAI
-import matplotlib
+from matplotlib import rcParams #字体
+# 设置中文字体
+rcParams['font.family'] = ['SimHei']
 
-matplotlib.rcParams['axes.unicode_minus'] = False
-matplotlib.rcParams['font.family'] = 'DejaVu Sans'
-matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+
 
 # AI睡眠分析函数
 def ai_sleep_analysis_stream(duration, sleep_time):
