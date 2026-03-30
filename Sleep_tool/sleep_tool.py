@@ -314,32 +314,47 @@ elif tab_choice == "睡眠分析":
         fig = plt.figure(figsize=(18,10))
         df_plot=df.dropna().copy()
 
-        ax1=plt.subplot(221)
-        colors=[]
+        # 图1：每日睡眠时长
+        ax1 = plt.subplot(2, 2, 1)
+        colors = []
         for h in df_plot["睡眠时长(小时)"]:
-            if h<5: colors.append("#ff4d4f")
-            elif h<7: colors.append("#ffa940")
-            elif h<=9: colors.append("#52c41a")
-            else: colors.append("#1890ff")
-        ax1.bar(df_plot["日期"], df_plot["睡眠时长(小时)"], color=colors, alpha=0.85)
-        ax1.axhline(7, color='red', linestyle='--', label="至少7小时")
-        ax1.set_title("每日睡眠时长")
-        ax1.tick_params(rotation=45)
-        ax1.legend()
+            if h < 5:
+                colors.append("#ff4d4f")
+            elif h < 7:
+                colors.append("#ffa940")
+            elif h <= 9:
+                colors.append("#52c41a")
+            else:
+                colors.append("#1890ff")
 
-        ax2=plt.subplot(222)
-        ax2.plot(df_plot["日期"], df_plot["入睡小时"], marker='o', color='#722ed1')
-        ax2.axhline(23+50/60, color='red', linestyle='--', label="23:50熬夜线")
-        ax2.set_title("入睡时间节律")
-        ax2.tick_params(rotation=45)
-        ax2.legend()
+        ax1.bar(df_plot["日期"], df_plot["睡眠时长(小时)"], color=colors, alpha=0.85, edgecolor='white', linewidth=1.5)
+        ax1.axhline(7, color='#ff4d4f', linestyle='--', linewidth=2, label='At least 7 hours')
+        ax1.set_title("Daily Sleep Duration", fontsize=14, pad=15)
+        ax1.set_ylabel("hours")
+        ax1.tick_params(axis='x', rotation=45)
+        ax1.grid(alpha=0.2)
+        ax1.legend(loc='upper right')
 
-        ax3=plt.subplot(212)
-        ax3.plot(df_plot["日期"], df_plot["睡眠评分"], marker='o', color='#13c2c2', linewidth=3)
-        ax3.axhline(70, color='orange', linestyle='--', label="合格线70分")
-        ax3.set_title("睡眠评分趋势")
-        ax3.tick_params(rotation=45)
-        ax3.legend()
+        # 图2：入睡时间节律
+        ax2 = plt.subplot(2, 2, 2)
+        ax2.plot(df_plot["日期"], df_plot["入睡小时"], marker='o', color='#722ed1',
+                 linewidth=2, markersize=8, markerfacecolor='white', markeredgewidth=2)
+        ax2.axhline(23 + 50 / 60, color='#ff4d4f', linestyle='--', linewidth=2, label='warning line 23:50')
+        ax2.set_title("Sleep Time", fontsize=14, pad=15)
+        ax2.set_ylabel("24h")
+        ax2.tick_params(axis='x', rotation=45)
+        ax2.grid(alpha=0.2)
+        ax2.legend(loc='upper right')
+
+        # 图3：睡眠评分趋势
+        ax3 = plt.subplot(2, 1, 2)
+        ax3.plot(df_plot["日期"], df_plot["睡眠评分"], color='#13c2c2', linewidth=3, marker='o', markersize=9)
+        ax3.axhline(70, color='orange', linestyle='--', linewidth=2, label='Passing line 70')
+        ax3.set_title("Sleep Quality Score Trend", fontsize=14, pad=15)
+        ax3.set_ylabel("score")
+        ax3.tick_params(axis='x', rotation=45)
+        ax3.grid(alpha=0.2)
+        ax3.legend(loc='upper right')
 
         plt.tight_layout()
         st.pyplot(fig)
