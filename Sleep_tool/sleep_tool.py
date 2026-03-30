@@ -5,11 +5,6 @@ from datetime import time
 import os
 from openai import OpenAI
 
-# ========================= 核心修复：中文永不乱码 ==========================
-plt.rcParams["font.family"] = ["WenQuanYi Zen Hei", "SimHei", "DejaVu Sans"]
-plt.rcParams["axes.unicode_minus"] = False  # 负号正常
-# ==========================================================================
-
 # AI睡眠分析函数
 def ai_sleep_analysis_stream(duration, sleep_time):
     client = OpenAI(
@@ -74,6 +69,7 @@ if save_clicked:
         # 计算时长
         def get_hour(t):
             return t.hour + t.minute / 60
+
 
         sleep_h = get_hour(sleep_time)
         getup_h = get_hour(getup_time)
@@ -269,9 +265,9 @@ elif tab_choice == "睡眠分析":
                 colors.append("#1890ff")
 
         ax1.bar(df_plot["日期"], df_plot["睡眠时长(小时)"], color=colors, alpha=0.85, edgecolor='white', linewidth=1.5)
-        ax1.axhline(7, color='#ff4d4f', linestyle='--', linewidth=2, label='建议最少 7 小时')
-        ax1.set_title("每日睡眠时长", fontsize=14, pad=15)
-        ax1.set_ylabel("小时")
+        ax1.axhline(7, color='#ff4d4f', linestyle='--', linewidth=2, label='At least 7 hours')
+        ax1.set_title("Daily Sleep Duration", fontsize=14, pad=15)
+        ax1.set_ylabel("hours")
         ax1.tick_params(axis='x', rotation=45)
         ax1.grid(alpha=0.2)
         ax1.legend(loc='upper right')
@@ -280,9 +276,9 @@ elif tab_choice == "睡眠分析":
         ax2 = plt.subplot(2, 2, 2)
         ax2.plot(df_plot["日期"], df_plot["入睡小时"], marker='o', color='#722ed1',
                  linewidth=2, markersize=8, markerfacecolor='white', markeredgewidth=2)
-        ax2.axhline(23 + 50 / 60, color='#ff4d4f', linestyle='--', linewidth=2, label='熬夜警戒线 23:50')
-        ax2.set_title("入睡时间节律", fontsize=14, pad=15)
-        ax2.set_ylabel("入睡时间（24h）")
+        ax2.axhline(23 + 50 / 60, color='#ff4d4f', linestyle='--', linewidth=2, label='warning line 23:50')
+        ax2.set_title("Sleep Time", fontsize=14, pad=15)
+        ax2.set_ylabel("24h")
         ax2.tick_params(axis='x', rotation=45)
         ax2.grid(alpha=0.2)
         ax2.legend(loc='upper right')
@@ -290,8 +286,8 @@ elif tab_choice == "睡眠分析":
         # 图3：睡眠评分趋势
         ax3 = plt.subplot(2, 1, 2)
         ax3.plot(df_plot["日期"], df_plot["睡眠评分"], color='#13c2c2', linewidth=3, marker='o', markersize=9)
-        ax3.axhline(70, color='orange', linestyle='--', linewidth=2, label='达标线 70分')
-        ax3.set_title("睡眠质量评分趋势", fontsize=14, pad=15)
+        ax3.axhline(70, color='orange', linestyle='--', linewidth=2, label='Passing line 70')
+        ax3.set_title("Sleep Quality Score Trend", fontsize=14, pad=15)
         ax3.tick_params(axis='x', rotation=45)
         ax3.grid(alpha=0.2)
         ax3.legend(loc='upper right')
