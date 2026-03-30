@@ -288,6 +288,7 @@ elif tab_choice == "睡眠分析":
         ax3.plot(df_plot["日期"], df_plot["睡眠评分"], color='#13c2c2', linewidth=3, marker='o', markersize=9)
         ax3.axhline(70, color='orange', linestyle='--', linewidth=2, label='Passing line 70')
         ax3.set_title("Sleep Quality Score Trend", fontsize=14, pad=15)
+        ax2.set_ylabel("score")
         ax3.tick_params(axis='x', rotation=45)
         ax3.grid(alpha=0.2)
         ax3.legend(loc='upper right')
