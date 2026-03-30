@@ -4,18 +4,29 @@ import matplotlib.pyplot as plt
 from datetime import time
 import os
 from openai import OpenAI
-from matplotlib import rcParams
+import matplotlib.font_manager as fm
 
-# ========== 修复中文显示（本地+云端通用）==========
-def set_chinese_font():
-    plt.rcParams['axes.unicode_minus'] = False
+# ===================== 强制全局中文字体（云端100%生效）=====================
+plt.rcParams['axes.unicode_minus'] = False
+
+# 下载并加载 SimHei 字体
+font_url = "https://cdn.jsdelivr.net/gh/StellarCN/scsl@master/SimHei.ttf"
+font_path = "/tmp/SimHei.ttf"
+
+if not os.path.exists(font_path):
     try:
-        plt.rcParams['font.family'] = 'WenQuanYi Zen Hei'
+        import urllib.request
+        urllib.request.urlretrieve(font_url, font_path)
     except:
-        plt.rcParams['font.family'] = 'SimHei'
-set_chinese_font()
-# ==============================================
+        pass
 
+# 全局应用中文字体
+try:
+    font_prop = fm.FontProperties(fname=font_path)
+    plt.rcParams['font.family'] = font_prop.get_name()
+except:
+    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'SimHei', 'DejaVu Sans']
+# ==========================================================================
 
 
 # AI睡眠分析函数
