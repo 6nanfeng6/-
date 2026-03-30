@@ -252,7 +252,6 @@ elif tab_choice == "睡眠分析":
 
         # 睡眠分析图表
         fig = plt.figure(figsize=(18, 10))
-        plt.rcParams["font.family"] = "sans-serif"
 
         # 先清理数据
         df_plot = df.dropna(subset=["睡眠时长(小时)", "睡眠评分", "入睡小时"]).copy()
