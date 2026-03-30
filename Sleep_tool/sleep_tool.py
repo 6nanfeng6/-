@@ -5,10 +5,12 @@ from datetime import time
 import os
 from openai import OpenAI
 
-# 解决云端中文乱码
+# ============================
+# 🔥 云端永久中文正常显示
+# ============================
+plt.rcParams['font.family'] = ['WenQuanYi Zen Hei']
 plt.rcParams['axes.unicode_minus'] = False
-plt.rcParams['font.family'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
-plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['figure.dpi'] = 100
 
 # AI睡眠分析函数
 def ai_sleep_analysis_stream(duration, sleep_time):
