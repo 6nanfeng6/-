@@ -2,10 +2,13 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import time
-from matplotlib import rcParams
 import os
 from openai import OpenAI
-rcParams['font.family'] = 'Microsoft YaHei'
+
+# 解决云端中文乱码
+plt.rcParams['axes.unicode_minus'] = False
+plt.rcParams['font.family'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
 
 # AI睡眠分析函数
 def ai_sleep_analysis_stream(duration, sleep_time):
